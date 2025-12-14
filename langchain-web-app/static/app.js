@@ -230,14 +230,84 @@ class LangChainApp {
 
 // Initialize app when DOM is ready
 document.addEventListener('DOMContentLoaded', () => {
-    window.app = new LangChainApp();
+    // Check if we are on an auth page
+    const loginForm = document.getElementById('loginForm');
+    const registerForm = document.getElementById('registerForm');
 
-    // Check health on startup
-    window.app.checkHealth().then(healthy => {
-        if (healthy) {
-            console.log('✓ LangChain Studio is ready');
-        } else {
-            console.warn('⚠ Backend connection issue');
-        }
-    });
+    if (loginForm) {
+        new AuthHandler('login');
+    } else if (registerForm) {
+        new AuthHandler('register');
+    } else {
+        // Main App
+        window.app = new LangChainApp();
+        // Check health on startup
+        window.app.checkHealth().then(healthy => {
+            if (healthy) {
+                console.log('✓ LangChain Studio is ready');
+            } else {
+                console.warn('⚠ Backend connection issue');
+            }
+        });
+    }
 });
+
+class AuthHandler {
+    constructor(type) {
+        this.type = type;
+        this.form = document.getElementById(`${type}Form`);
+        this.message = document.getElementById('authMessage');
+        this.init();
+    }
+
+    init() {
+        this.form.addEventListener('submit', (e) => this.handleSubmit(e));
+    }
+
+    async handleSubmit(e) {
+        e.preventDefault();
+        const formData = new FormData(this.form);
+        const data = Object.fromEntries(formData.entries());
+
+        // Disable button
+        const btn = this.form.querySelector('button');
+        const originalText = btn.textContent;
+        btn.disabled = true;
+        btn.textContent = 'Processing...';
+
+        try {
+            const response = await fetch(`/${this.type}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(data),
+            });
+
+            const result = await response.json();
+
+            if (!response.ok) {
+                throw new Error(result.error || 'Authentication failed');
+            }
+
+            this.showMessage(result.message, 'success');
+
+            if (this.type === 'login') {
+                setTimeout(() => window.location.href = '/', 1000);
+            } else {
+                setTimeout(() => window.location.href = '/login', 1500);
+            }
+
+        } catch (error) {
+            this.showMessage(error.message, 'error');
+            btn.disabled = false;
+            btn.textContent = originalText;
+        }
+    }
+
+    showMessage(text, type) {
+        this.message.textContent = text;
+        this.message.className = type;
+        this.message.classList.remove('hidden');
+    }
+}
