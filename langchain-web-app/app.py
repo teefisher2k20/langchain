@@ -20,9 +20,7 @@ from langchain_community.tools import DuckDuckGoSearchRun
 from langchain.agents import AgentExecutor, create_openai_functions_agent, tool
 from langchain_core.prompts import MessagesPlaceholder
 from dotenv import load_dotenv
-from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from flask_sqlalchemy import SQLAlchemy
-from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 import os
 import json
@@ -41,70 +39,48 @@ app.config['UPLOAD_FOLDER'] = 'uploads'
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max-limit
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///users.db'
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///chat.db'
 db = SQLAlchemy(app)
 
-# Global Vector Store (In-memory for demo)
-vector_store = None
-
-login_manager = LoginManager()
-login_manager.init_app(app)
-login_manager.login_view = 'login'
-
-class User(UserMixin, db.Model):
+class ChatMessage(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    username = db.Column(db.String(150), unique=True, nullable=False)
-    password = db.Column(db.String(150), nullable=False)
+    session_id = db.Column(db.String(100), nullable=False)
+    role = db.Column(db.String(20), nullable=False)
+    content = db.Column(db.Text, nullable=False)
+    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
 
-@login_manager.user_loader
-def load_user(user_id):
-    return db.session.get(User, int(user_id))
+    def to_dict(self):
+        return {
+            'role': self.role,
+            'content': self.content,
+            'timestamp': self.timestamp.isoformat()
+        }
 
+# Global Vector Store (In-memory for demo)
+# Global Vector Store (In-memory for demo, but we will try to load from disk)
+vector_store = None
+FAISS_INDEX_PATH = "faiss_index"
+
+def load_vector_store():
+    global vector_store
+    if os.path.exists(FAISS_INDEX_PATH):
+        try:
+            embeddings = OpenAIEmbeddings()
+            vector_store = FAISS.load_local(FAISS_INDEX_PATH, embeddings, allow_dangerous_deserialization=True)
+            print("Loaded FAISS index from disk.")
+        except Exception as e:
+            print(f"Failed to load FAISS index: {e}")
+            vector_store = None
 
 @app.route('/')
-@login_required
 def index():
     """Main application page"""
-    return render_template('index.html', user=current_user)
+    return render_template('index.html')
 
-@app.route('/login', methods=['GET', 'POST'])
-def login():
-    if request.method == 'POST':
-        data = request.get_json()
-        username = data.get('username')
-        password = data.get('password')
-        user = User.query.filter_by(username=username).first()
-        if user and check_password_hash(user.password, password):
-            login_user(user)
-            return jsonify({'message': 'Logged in successfully'})
-        return jsonify({'error': 'Invalid credentials'}), 401
-    return render_template('login.html')
 
-@app.route('/register', methods=['GET', 'POST'])
-def register():
-    if request.method == 'POST':
-        data = request.get_json()
-        username = data.get('username')
-        password = data.get('password')
-        
-        if User.query.filter_by(username=username).first():
-            return jsonify({'error': 'Username already exists'}), 400
-            
-        new_user = User(username=username, password=generate_password_hash(password))
-        db.session.add(new_user)
-        db.session.commit()
-        return jsonify({'message': 'Registered successfully'})
-    return render_template('register.html')
-
-@app.route('/logout')
-@login_required
-def logout():
-    logout_user()
-    return jsonify({'message': 'Logged out successfully'})
 
 
 @app.route('/api/upload', methods=['POST'])
-@login_required
 def upload_file():
     global vector_store
     if 'file' not in request.files:
@@ -137,6 +113,9 @@ def upload_file():
                 vector_store = FAISS.from_documents(splits, embeddings)
             else:
                 vector_store.add_documents(splits)
+            
+            # Save to disk
+            vector_store.save_local(FAISS_INDEX_PATH)
                 
             return jsonify({'message': f'Successfully processed {filename}', 'chunks': len(splits)})
             
@@ -144,7 +123,6 @@ def upload_file():
             return jsonify({'error': str(e)}), 500
 
 @app.route('/api/chat', methods=['POST'])
-@login_required
 def chat():
     global vector_store
     """Handle chat requests"""
@@ -154,13 +132,21 @@ def chat():
         
         if not user_message:
             return jsonify({'error': 'No message provided'}), 400
+            
+        session_id = request.headers.get('X-Session-ID', 'default')
+
+        # Save User Message
+        user_msg_db = ChatMessage(session_id=session_id, role='user', content=user_message)
+        db.session.add(user_msg_db)
+        db.session.commit()
         
         # Initialize the model
         try:
             llm = ChatOpenAI(temperature=0.7, model="gpt-3.5-turbo")
             
-            ai_response = ""
             source_docs = []
+            chain = None
+            inputs = {}
             
             if vector_store:
                 # RAG Flow with LCEL
@@ -169,6 +155,10 @@ def chat():
                 # Retrieve and format documents
                 docs = retriever.invoke(user_message)
                 formatted_context = "\n\n".join(doc.page_content for doc in docs)
+                
+                # Extract sources
+                source_docs = [doc.metadata.get("source", "Unknown") for doc in docs]
+                source_docs = list(set(source_docs))
                 
                 prompt = ChatPromptTemplate.from_template("""Answer the following question based only on the provided context:
 
@@ -180,33 +170,40 @@ Question: {input}""")
                 
                 # LCEL Chain
                 chain = prompt | llm | StrOutputParser()
-                ai_response = chain.invoke({"context": formatted_context, "input": user_message})
+                inputs = {"context": formatted_context, "input": user_message}
                 
-                # Extract sources
-                source_docs = [doc.metadata.get("source", "Unknown") for doc in docs]
-                # Deduplicate sources
-                source_docs = list(set(source_docs))
             else:
                 # Standard Chat Flow
-                msg = llm.invoke(user_message)
-                ai_response = msg.content
+                prompt = ChatPromptTemplate.from_template("{input}")
+                chain = prompt | llm | StrOutputParser()
+                inputs = {"input": user_message}
             
-            response_data = {
-                'message': ai_response,
-                'timestamp': datetime.now().isoformat(),
-                'model': 'gpt-3.5-turbo',
-                'sources': source_docs
-            }
+            def generate():
+                full_response = ""
+                for chunk in chain.stream(inputs):
+                    full_response += chunk
+                    yield chunk
+                
+                # Save Assistant Message
+                with app.app_context():
+                    ai_msg_db = ChatMessage(session_id=session_id, role='assistant', content=full_response)
+                    db.session.add(ai_msg_db)
+                    db.session.commit()
+
+            response = Response(stream_with_context(generate()), content_type='text/plain')
+            response.headers['X-Sources'] = json.dumps(source_docs)
+            return response
+
         except Exception as e:
             return jsonify({'error': f"LangChain Error: {str(e)}"}), 500
         
-        return jsonify(response_data)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
     
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/agent', methods=['POST'])
-@login_required
 def agent_run():
     """Handle agent requests"""
     try:
@@ -277,7 +274,14 @@ def health():
         'langchain_version': '0.3.15'
     })
 
+@app.route('/api/history', methods=['GET'])
+def get_history():
+    session_id = request.headers.get('X-Session-ID', 'default')
+    messages = ChatMessage.query.filter_by(session_id=session_id).order_by(ChatMessage.timestamp).all()
+    return jsonify([msg.to_dict() for msg in messages])
+
 if __name__ == '__main__':
     with app.app_context():
         db.create_all()
+        load_vector_store()
     app.run(debug=True, host='0.0.0.0', port=5000)

@@ -107,9 +107,11 @@ http://localhost:5000
 
 ## Features Demonstrated
 
-✅ **Chat Interface**: Fully functional with message history  
+✅ **Chat Interface**: Fully functional with message history, streaming, and RAG sources
 ✅ **Model Selector**: Dropdown to choose different AI models  
-✅ **Navigation**: Smooth view switching between Chat, Models, Agents, and Chains  
+✅ **Agent System**: Autonomous agent with tools (Search, Calculator)
+✅ **Knowledge Base**: Upload PDF/Text files for RAG
+✅ **Navigation**: Smooth view switching between Chat, Models, Knowledge, and Agents
 ✅ **Responsive Design**: Works on desktop and mobile devices  
 ✅ **Real-time Updates**: Instant message display with animations  
 ✅ **Health Monitoring**: Backend health check endpoint  

@@ -8,11 +8,22 @@ class LangChainApp {
     }
 
     init() {
+        this.setupSession();
         this.setupEventListeners();
         this.setupUploadHandlers();
         this.setupAgentHandler();
         this.loadModels();
+        this.loadHistory(); // Load previous chat
         this.autoResizeTextarea();
+    }
+
+    setupSession() {
+        let sessionId = localStorage.getItem('chat_session_id');
+        if (!sessionId) {
+            sessionId = 'sess_' + Math.random().toString(36).substr(2, 9);
+            localStorage.setItem('chat_session_id', sessionId);
+        }
+        this.sessionId = sessionId;
     }
 
     setupEventListeners() {
@@ -213,28 +224,59 @@ class LangChainApp {
         const sendButton = document.getElementById('send-button');
         sendButton.disabled = true;
 
+        // Create Assistant Message Placeholder
+        const aiMessageDiv = this.addMessage('assistant', '...');
+        const aiContent = aiMessageDiv.querySelector('.message-content');
+        let fullResponse = '';
+
         try {
-            // Send to backend
             const response = await fetch('/api/chat', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
+                    'X-Session-ID': this.sessionId
                 },
-                body: JSON.stringify({ message }),
+                body: JSON.stringify({ message })
             });
 
-            if (!response.ok) {
-                throw new Error('Failed to get response');
+            if (!response.ok) throw new Error('Network response form was not ok');
+
+            // Handle sources header
+            const sourcesHeader = response.headers.get('X-Sources');
+            const sources = sourcesHeader ? JSON.parse(sourcesHeader) : [];
+
+            // Clear '...' loading state
+            aiContent.textContent = '';
+
+            // Read the stream
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                const chunk = decoder.decode(value, { stream: true });
+                fullResponse += chunk;
+                // Basic markdown to HTML (you might want a library like marked.js)
+                aiContent.innerHTML = fullResponse.replace(/\n/g, '<br>');
+                this.scrollToBottom();
             }
 
-            const data = await response.json();
-
-            // Add assistant message
-            this.addMessage('assistant', data.message);
+            // Append sources if available
+            if (sources && sources.length > 0) {
+                const sourcesHtml = `
+                    <div class="sources-list" style="margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.1);">
+                        <small style="color: var(--text-tertiary);">Sources: ${sources.join(', ')}</small>
+                    </div>
+                `;
+                aiContent.insertAdjacentHTML('beforeend', sourcesHtml);
+            }
 
         } catch (error) {
-            console.error('Error:', error);
-            this.addMessage('assistant', '❌ Sorry, there was an error processing your request. Please try again.');
+            console.error('Chat Error:', error);
+            aiContent.textContent = '❌ Error: Failed to get response.';
+            aiContent.style.color = 'var(--danger-color)';
         } finally {
             sendButton.disabled = false;
             input.focus();
@@ -261,16 +303,13 @@ class LangChainApp {
         const content = document.createElement('div');
         content.className = 'message-content';
 
-        const messageText = document.createElement('div');
-        messageText.className = 'message-text';
-        messageText.textContent = text;
-
-        const time = document.createElement('div');
-        time.className = 'message-time';
-        time.textContent = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-
-        content.appendChild(messageText);
-        content.appendChild(time);
+        // Direct text textContent if not '...' (placeholder)
+        if (text === '...') {
+            // Placeholder
+            content.innerHTML = '<span class="typing-indicator">...</span>';
+        } else {
+            content.textContent = text;
+        }
 
         messageDiv.appendChild(avatar);
         messageDiv.appendChild(content);
@@ -282,6 +321,32 @@ class LangChainApp {
 
         // Store message
         this.messages.push({ role, text, timestamp: new Date() });
+
+        return messageDiv; // Vital for streaming updates
+
+    }
+
+    async loadHistory() {
+        try {
+            const response = await fetch('/api/history', {
+                headers: { 'X-Session-ID': this.sessionId }
+            });
+            if (response.ok) {
+                const history = await response.json();
+                if (history.length > 0) {
+                    // Clear welcome message if history exists
+                    const messagesContainer = document.getElementById('messages');
+                    const welcomeMessage = messagesContainer.querySelector('.welcome-message');
+                    if (welcomeMessage) welcomeMessage.remove();
+
+                    history.forEach(msg => {
+                        this.addMessage(msg.role, msg.content);
+                    });
+                }
+            }
+        } catch (error) {
+            console.error('Failed to load history:', error);
+        }
     }
 
     clearChat() {
@@ -294,6 +359,7 @@ class LangChainApp {
             </div>
         `;
         this.messages = [];
+        // Optional: Clear on backend too if we implemented that
     }
 
     async loadModels() {
@@ -362,84 +428,16 @@ class LangChainApp {
 
 // Initialize app when DOM is ready
 document.addEventListener('DOMContentLoaded', () => {
-    // Check if we are on an auth page
-    const loginForm = document.getElementById('loginForm');
-    const registerForm = document.getElementById('registerForm');
-
-    if (loginForm) {
-        new AuthHandler('login');
-    } else if (registerForm) {
-        new AuthHandler('register');
-    } else {
-        // Main App
-        window.app = new LangChainApp();
-        // Check health on startup
-        window.app.checkHealth().then(healthy => {
-            if (healthy) {
-                console.log('✓ LangChain Studio is ready');
-            } else {
-                console.warn('⚠ Backend connection issue');
-            }
-        });
-    }
+    // Main App
+    window.app = new LangChainApp();
+    // Check health on startup
+    window.app.checkHealth().then(healthy => {
+        if (healthy) {
+            console.log('✓ LangChain Studio is ready');
+        } else {
+            console.warn('⚠ Backend connection issue');
+        }
+    });
 });
 
-class AuthHandler {
-    constructor(type) {
-        this.type = type;
-        this.form = document.getElementById(`${type}Form`);
-        this.message = document.getElementById('authMessage');
-        this.init();
-    }
 
-    init() {
-        this.form.addEventListener('submit', (e) => this.handleSubmit(e));
-    }
-
-    async handleSubmit(e) {
-        e.preventDefault();
-        const formData = new FormData(this.form);
-        const data = Object.fromEntries(formData.entries());
-
-        // Disable button
-        const btn = this.form.querySelector('button');
-        const originalText = btn.textContent;
-        btn.disabled = true;
-        btn.textContent = 'Processing...';
-
-        try {
-            const response = await fetch(`/${this.type}`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(data),
-            });
-
-            const result = await response.json();
-
-            if (!response.ok) {
-                throw new Error(result.error || 'Authentication failed');
-            }
-
-            this.showMessage(result.message, 'success');
-
-            if (this.type === 'login') {
-                setTimeout(() => window.location.href = '/', 1000);
-            } else {
-                setTimeout(() => window.location.href = '/login', 1500);
-            }
-
-        } catch (error) {
-            this.showMessage(error.message, 'error');
-            btn.disabled = false;
-            btn.textContent = originalText;
-        }
-    }
-
-    showMessage(text, type) {
-        this.message.textContent = text;
-        this.message.className = type;
-        this.message.classList.remove('hidden');
-    }
-}
