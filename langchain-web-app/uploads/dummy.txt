@@ -1,0 +1,3 @@
+The secret code for the project is "BlueberryPie".
+LangChain Studio is built with Flask and Vanilla JS.
+The text you are reading now is used to test the RAG system.

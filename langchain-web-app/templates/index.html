@@ -38,6 +38,14 @@
                     </svg>
                     <span>Models</span>
                 </button>
+
+                <button class="nav-item" data-view="knowledge">
+                    <svg class="nav-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                    <span>Knowledge</span>
+                </button>
                 
                 <button class="nav-item" data-view="agents">
                     <svg class="nav-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -129,17 +137,64 @@
                 <div class="models-grid" id="models-grid">
                     <div class="loading">Loading models...</div>
                 </div>
+            <!-- Knowledge View -->
+            <div class="view" id="knowledge-view">
+                <div class="view-header">
+                    <h2>Knowledge Base</h2>
+                </div>
+                <div class="knowledge-container" style="padding: 24px; max-width: 800px; margin: 0 auto;">
+                    <div class="upload-card">
+                        <div class="upload-icon">📄</div>
+                        <h3>Upload Documents</h3>
+                        <p>Upload PDF or Text files to train the AI assistant.</p>
+                        
+                        <div class="upload-area" id="drop-zone">
+                            <input type="file" id="file-input" accept=".pdf,.txt" hidden>
+                            <button class="btn-primary" onclick="document.getElementById('file-input').click()">Choose File</button>
+                            <p class="upload-hint">or drag and drop here</p>
+                        </div>
+                        
+                        <div id="upload-status" class="hidden">
+                            <div class="progress-bar">
+                                <div class="progress-fill"></div>
+                            </div>
+                            <p class="status-text">Uploading...</p>
+                        </div>
+                    </div>
+
+                    <div class="info-box">
+                        <h4>ℹ️ How it works</h4>
+                        <p>Uploaded documents are split into chunks and stored in an in-memory vector database. The AI will search these documents to answer your questions.</p>
+                        <p class="warning-text">⚠️ Note: Data is lost when the server restarts.</p>
+                    </div>
+                </div>
             </div>
-            
+
             <!-- Agents View -->
             <div class="view" id="agents-view">
                 <div class="view-header">
-                    <h2>AI Agents</h2>
+                    <h2>Autonomous Agent</h2>
                 </div>
-                <div class="content-placeholder">
-                    <div class="placeholder-icon">🤖</div>
-                    <h3>Agent Management</h3>
-                    <p>Create and manage AI agents for autonomous task completion</p>
+                <div class="agent-container" style="padding: 24px; max-width: 800px; margin: 0 auto;">
+                    <div class="agent-card" style="background: var(--bg-secondary); border-radius: var(--radius-lg); padding: 24px; border: 1px solid var(--border-color);">
+                        <div style="text-align: center; margin-bottom: 24px;">
+                            <div style="font-size: 48px; margin-bottom: 16px;">🤖</div>
+                            <h3>Task Solver Agent</h3>
+                            <p style="color: var(--text-secondary);">Powered by OpenAI Functions, this agent can use tools like <b>Search</b> and <b>Calculator</b> to solve multi-step problems.</p>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="agent-goal">What should the agent do?</label>
+                            <textarea id="agent-goal" placeholder="e.g. Who is the current president of France and what is their age raised to the power of 2?" rows="3" style="width: 100%; padding: 12px; border-radius: var(--radius-sm); border: 1px solid var(--border-color); background: var(--bg-tertiary); color: var(--text-primary); resize: none;"></textarea>
+                        </div>
+                        
+                        <button id="run-agent-btn" class="btn-primary full-width">Execute Agent</button>
+                        
+                        <div id="agent-result" class="hidden" style="margin-top: 24px; padding-top: 24px; border-top: 1px solid var(--border-color);">
+                             <h4 style="margin-bottom: 12px;">Agent Result:</h4>
+                             <div class="result-content" style="background: var(--bg-tertiary); padding: 16px; border-radius: var(--radius-sm); min-height: 50px;"></div>
+                        </div>
+                    </div>
                 </div>
             </div>
             

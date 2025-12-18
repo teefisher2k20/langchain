@@ -9,6 +9,8 @@ class LangChainApp {
 
     init() {
         this.setupEventListeners();
+        this.setupUploadHandlers();
+        this.setupAgentHandler();
         this.loadModels();
         this.autoResizeTextarea();
     }
@@ -41,6 +43,136 @@ class LangChainApp {
         messageInput.addEventListener('input', () => {
             this.autoResizeTextarea();
         });
+    }
+
+    setupUploadHandlers() {
+        const dropZone = document.getElementById('drop-zone');
+        const fileInput = document.getElementById('file-input');
+
+        if (!dropZone || !fileInput) return;
+
+        // Drag and drop events
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, preventDefaults, false);
+        });
+
+        function preventDefaults(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dropZone.addEventListener(eventName, () => dropZone.classList.add('dragover'));
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, () => dropZone.classList.remove('dragover'));
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+            const dt = e.dataTransfer;
+            const files = dt.files;
+            this.handleFiles(files);
+        });
+
+        fileInput.addEventListener('change', () => {
+            this.handleFiles(fileInput.files);
+        });
+    }
+
+    setupAgentHandler() {
+        const runBtn = document.getElementById('run-agent-btn');
+        const goalInput = document.getElementById('agent-goal');
+        const resultDiv = document.getElementById('agent-result');
+        const resultContent = resultDiv ? resultDiv.querySelector('.result-content') : null;
+
+        if (!runBtn || !goalInput) return;
+
+        runBtn.addEventListener('click', async () => {
+            const goal = goalInput.value.trim();
+            if (!goal) return;
+
+            // Loading state
+            runBtn.disabled = true;
+            runBtn.textContent = 'Agent is thinking... (this may take a moment)';
+            resultDiv.classList.add('hidden');
+
+            try {
+                const response = await fetch('/api/agent', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ goal })
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) throw new Error(data.error || 'Agent failed');
+
+                // Show Result
+                resultContent.textContent = data.output;
+                resultDiv.classList.remove('hidden');
+
+            } catch (error) {
+                console.error('Agent Error:', error);
+                resultContent.textContent = `❌ ${error.message}`;
+                resultContent.style.color = 'var(--danger-color)';
+                resultDiv.classList.remove('hidden');
+            } finally {
+                runBtn.disabled = false;
+                runBtn.textContent = 'Execute Agent';
+            }
+        });
+    }
+
+    handleFiles(files) {
+        if (files.length > 0) {
+            this.uploadFile(files[0]);
+        }
+    }
+
+    async uploadFile(file) {
+        const statusDiv = document.getElementById('upload-status');
+        const progressBar = statusDiv.querySelector('.progress-fill');
+        const statusText = statusDiv.querySelector('.status-text');
+
+        statusDiv.classList.remove('hidden');
+        progressBar.style.width = '0%';
+        statusText.textContent = `Uploading ${file.name}...`;
+
+        const formData = new FormData();
+        formData.append('file', file);
+
+        try {
+            // Simulated progress
+            progressBar.style.width = '50%';
+
+            const response = await fetch('/api/upload', {
+                method: 'POST',
+                body: formData
+            });
+
+            if (!response.ok) throw new Error('Upload failed');
+
+            const result = await response.json();
+
+            progressBar.style.width = '100%';
+            statusText.textContent = `✅ ${result.message} (${result.chunks} chunks)`;
+            statusText.style.color = 'var(--success-color)';
+
+            // Revert status after delay
+            setTimeout(() => {
+                statusDiv.classList.add('hidden');
+                statusText.style.color = '';
+                // Optional: switch to chat view automatically?
+                // this.switchView('chat'); 
+            }, 3000);
+
+        } catch (error) {
+            console.error('Upload Error:', error);
+            statusText.textContent = '❌ Upload failed. Please try again.';
+            statusText.style.color = 'var(--danger-color)';
+            progressBar.style.background = 'var(--danger-color)';
+        }
     }
 
     switchView(viewName) {
