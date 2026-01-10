@@ -129,6 +129,11 @@ def chat():
     try:
         data = request.get_json()
         user_message = data.get('message', '')
+        model_id = data.get('model', 'gpt-3.5-turbo')
+        
+        # Handle demo mode or missing model
+        if not model_id or model_id == 'demo':
+            model_id = 'gpt-3.5-turbo'
         
         if not user_message:
             return jsonify({'error': 'No message provided'}), 400
@@ -142,7 +147,10 @@ def chat():
         
         # Initialize the model
         try:
-            llm = ChatOpenAI(temperature=0.7, model="gpt-3.5-turbo")
+            # For now, we use ChatOpenAI. If a non-OpenAI model is selected, 
+            # we fallback to gpt-3.5-turbo or could add more providers here.
+            llm_model = model_id if model_id.startswith('gpt') else 'gpt-3.5-turbo'
+            llm = ChatOpenAI(temperature=0.7, model=llm_model)
             
             source_docs = []
             chain = None
@@ -195,13 +203,17 @@ Question: {input}""")
             return response
 
         except Exception as e:
+            print(f"LangChain Error: {str(e)}")  # Log to console
+            import traceback
+            traceback.print_exc()
             return jsonify({'error': f"LangChain Error: {str(e)}"}), 500
-        
+
     except Exception as e:
+        print(f"Chat Error: {str(e)}")  # Log to console
+        import traceback
+        traceback.print_exc()
         return jsonify({'error': str(e)}), 500
-    
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+
 
 @app.route('/api/agent', methods=['POST'])
 def agent_run():
@@ -209,12 +221,17 @@ def agent_run():
     try:
         data = request.get_json()
         user_goal = data.get('goal', '')
+        model_id = data.get('model', 'gpt-3.5-turbo')
         
         if not user_goal:
             return jsonify({'error': 'No goal provided'}), 400
             
         try:
-            llm = ChatOpenAI(temperature=0, model="gpt-3.5-turbo")
+            # Initialize model
+            llm_model = (
+                model_id if model_id.startswith('gpt') else 'gpt-3.5-turbo'
+            )
+            llm = ChatOpenAI(temperature=0, model=llm_model)
             
             # Define Tools
             search = DuckDuckGoSearchRun()
@@ -254,6 +271,45 @@ def agent_run():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+
+@app.route('/api/chain', methods=['POST'])
+def chain_run():
+    """Handle custom LCEL chain requests"""
+    try:
+        data = request.get_json()
+        template = data.get('template', '')
+        inputs = data.get('input', {})
+        model_id = data.get('model', 'gpt-3.5-turbo')
+        
+        if not template:
+            return jsonify({'error': 'No template provided'}), 400
+            
+        try:
+            # Initialize model
+            llm_model = (
+                model_id if model_id.startswith('gpt') else 'gpt-3.5-turbo'
+            )
+            llm = ChatOpenAI(temperature=0.7, model=llm_model)
+            
+            # Build LCEL Chain
+            prompt = ChatPromptTemplate.from_template(template)
+            chain = prompt | llm | StrOutputParser()
+            
+            # Run Chain
+            result = chain.invoke(inputs)
+            
+            return jsonify({
+                'output': result,
+                'timestamp': datetime.now().isoformat()
+            })
+            
+        except Exception as e:
+            return jsonify({'error': f"Chain Error: {str(e)}"}), 500
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
 @app.route('/api/models', methods=['GET'])
 def get_models():
     """Get available LangChain models"""
@@ -279,6 +335,7 @@ def get_history():
     session_id = request.headers.get('X-Session-ID', 'default')
     messages = ChatMessage.query.filter_by(session_id=session_id).order_by(ChatMessage.timestamp).all()
     return jsonify([msg.to_dict() for msg in messages])
+
 
 if __name__ == '__main__':
     with app.app_context():

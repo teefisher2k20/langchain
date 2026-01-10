@@ -108,10 +108,11 @@ http://localhost:5000
 ## Features Demonstrated
 
 ✅ **Chat Interface**: Fully functional with message history, streaming, and RAG sources
-✅ **Model Selector**: Dropdown to choose different AI models  
+✅ **Model Selector**: Fully synchronized with backend (OpenAI models)
+✅ **LCEL Chain Builder**: Interactive workspace for building and testing chains
 ✅ **Agent System**: Autonomous agent with tools (Search, Calculator)
-✅ **Knowledge Base**: Upload PDF/Text files for RAG
-✅ **Navigation**: Smooth view switching between Chat, Models, Knowledge, and Agents
+✅ **Knowledge Base**: Upload PDF/Text files for persistent RAG (FAISS)
+✅ **Navigation**: Smooth view switching between all functional views
 ✅ **Responsive Design**: Works on desktop and mobile devices  
 ✅ **Real-time Updates**: Instant message display with animations  
 ✅ **Health Monitoring**: Backend health check endpoint  

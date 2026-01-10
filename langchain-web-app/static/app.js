@@ -12,6 +12,7 @@ class LangChainApp {
         this.setupEventListeners();
         this.setupUploadHandlers();
         this.setupAgentHandler();
+        this.setupChainHandler();
         this.loadModels();
         this.loadHistory(); // Load previous chat
         this.autoResizeTextarea();
@@ -112,7 +113,10 @@ class LangChainApp {
                 const response = await fetch('/api/agent', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ goal })
+                    body: JSON.stringify({
+                        goal,
+                        model: document.getElementById('model-selector').value
+                    })
                 });
 
                 const data = await response.json();
@@ -131,6 +135,63 @@ class LangChainApp {
             } finally {
                 runBtn.disabled = false;
                 runBtn.textContent = 'Execute Agent';
+            }
+        });
+    }
+
+    setupChainHandler() {
+        const runBtn = document.getElementById('run-chain-btn');
+        const templateInput = document.getElementById('chain-template');
+        const variablesInput = document.getElementById('chain-input');
+        const resultDiv = document.getElementById('chain-result');
+        const resultContent = resultDiv ? resultDiv.querySelector('.result-content') : null;
+
+        if (!runBtn || !templateInput) return;
+
+        runBtn.addEventListener('click', async () => {
+            const template = templateInput.value.trim();
+            const variablesStr = variablesInput.value.trim();
+
+            let variables = {};
+            try {
+                variables = JSON.parse(variablesStr);
+            } catch (e) {
+                alert('Invalid JSON in Input Variables');
+                return;
+            }
+
+            // Loading state
+            runBtn.disabled = true;
+            runBtn.textContent = 'Executing Chain...';
+            resultDiv.classList.add('hidden');
+
+            try {
+                const response = await fetch('/api/chain', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        template,
+                        input: variables,
+                        model: document.getElementById('model-selector').value
+                    })
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) throw new Error(data.error || 'Chain failed');
+
+                // Show Result
+                resultContent.textContent = data.output;
+                resultDiv.classList.remove('hidden');
+
+            } catch (error) {
+                console.error('Chain Error:', error);
+                resultContent.textContent = `❌ ${error.message}`;
+                resultContent.style.color = 'var(--danger-color)';
+                resultDiv.classList.remove('hidden');
+            } finally {
+                runBtn.disabled = false;
+                runBtn.textContent = 'Run LCEL Chain';
             }
         });
     }
@@ -229,6 +290,10 @@ class LangChainApp {
         const aiContent = aiMessageDiv.querySelector('.message-content');
         let fullResponse = '';
 
+        // Get selected model
+        const modelSelector = document.getElementById('model-selector');
+        const selectedModel = modelSelector ? modelSelector.value : 'gpt-3.5-turbo';
+
         try {
             const response = await fetch('/api/chat', {
                 method: 'POST',
@@ -236,7 +301,10 @@ class LangChainApp {
                     'Content-Type': 'application/json',
                     'X-Session-ID': this.sessionId
                 },
-                body: JSON.stringify({ message })
+                body: JSON.stringify({
+                    message,
+                    model: selectedModel
+                })
             });
 
             if (!response.ok) throw new Error('Network response form was not ok');

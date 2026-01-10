@@ -190,12 +190,56 @@
             <!-- Chains View -->
             <div class="view" id="chains-view">
                 <div class="view-header">
-                    <h2>LangChain Chains</h2>
+                    <h2>LangChain Expression Language (LCEL)</h2>
                 </div>
-                <div class="content-placeholder">
-                    <div class="placeholder-icon">⛓️</div>
-                    <h3>Chain Builder</h3>
-                    <p>Build complex workflows by chaining LLM operations</p>
+                <div class="chain-builder-container" style="padding: 24px; max-width: 900px; margin: 0 auto;">
+                    <div class="chain-workspace" style="display: flex; flex-direction: column; gap: 20px;">
+                        <!-- Chain Steps -->
+                        <div id="chain-steps" class="chain-steps" style="display: flex; align-items: center; gap: 12px; overflow-x: auto; padding-bottom: 20px;">
+                            <div class="chain-step" data-type="prompt" style="background: var(--bg-secondary); border: 2px solid var(--primary-color); padding: 16px; border-radius: var(--radius-md); min-width: 150px; text-align: center;">
+                                <div style="font-size: 24px;">📝</div>
+                                <div style="font-weight: 600; margin-top: 8px;">Prompt</div>
+                                <div style="font-size: 12px; color: var(--text-tertiary);">Base Prompt</div>
+                            </div>
+                            
+                            <div style="font-size: 24px; color: var(--text-tertiary);">→</div>
+                            
+                            <div class="chain-step" data-type="llm" style="background: var(--bg-secondary); border: 2px solid var(--secondary-color); padding: 16px; border-radius: var(--radius-md); min-width: 150px; text-align: center;">
+                                <div style="font-size: 24px;">🧠</div>
+                                <div style="font-weight: 600; margin-top: 8px;">LLM</div>
+                                <div style="font-size: 12px; color: var(--text-tertiary);">GPT-3.5 Turbo</div>
+                            </div>
+                            
+                            <div style="font-size: 24px; color: var(--text-tertiary);">→</div>
+                            
+                            <div class="chain-step" data-type="output" style="background: var(--bg-secondary); border: 2px solid var(--success-color); padding: 16px; border-radius: var(--radius-md); min-width: 150px; text-align: center;">
+                                <div style="font-size: 24px;">📤</div>
+                                <div style="font-weight: 600; margin-top: 8px;">Parser</div>
+                                <div style="font-size: 12px; color: var(--text-tertiary);">StrOutputParser</div>
+                            </div>
+                        </div>
+
+                        <!-- Configuration -->
+                        <div class="chain-config" style="background: var(--bg-secondary); border-radius: var(--radius-lg); padding: 24px; border: 1px solid var(--border-color);">
+                            <div class="form-group">
+                                <label>System Template</label>
+                                <textarea id="chain-template" rows="3" style="width: 100%; padding: 12px; border-radius: var(--radius-sm); border: 1px solid var(--border-color); background: var(--bg-tertiary); color: var(--text-primary); resize: none;">You are a creative storyteller. Write a very short story about: {topic}</textarea>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label>Input Variables (JSON)</label>
+                                <input id="chain-input" type="text" value='{"topic": "a brave little toaster"}' style="width: 100%; padding: 12px; border-radius: var(--radius-sm); border: 1px solid var(--border-color); background: var(--bg-tertiary); color: var(--text-primary);">
+                            </div>
+                            
+                            <button id="run-chain-btn" class="btn-primary full-width">Run LCEL Chain</button>
+                        </div>
+                        
+                        <!-- Result -->
+                        <div id="chain-result" class="hidden" style="background: var(--bg-secondary); border-radius: var(--radius-lg); padding: 24px; border: 1px solid var(--border-color);">
+                             <h4 style="margin-bottom: 12px;">Chain Execution Result:</h4>
+                             <div class="result-content" style="background: var(--bg-tertiary); padding: 16px; border-radius: var(--radius-sm); min-height: 100px; white-space: pre-wrap;"></div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </main>
