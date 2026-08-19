@@ -1,4 +1,8 @@
+"""Integration tests for LangChain components."""
+
 # ruff: noqa: E402
+import importlib.util
+
 import pytest
 
 # Rewrite assert statements for test suite so that implementations can
@@ -17,22 +21,40 @@ modules = [
 for module in modules:
     pytest.register_assert_rewrite(f"langchain_tests.integration_tests.{module}")
 
-from .base_store import BaseStoreAsyncTests, BaseStoreSyncTests
-from .cache import AsyncCacheTestSuite, SyncCacheTestSuite
-from .chat_models import ChatModelIntegrationTests
-from .embeddings import EmbeddingsIntegrationTests
-from .retrievers import RetrieversIntegrationTests
-from .tools import ToolsIntegrationTests
-from .vectorstores import VectorStoreIntegrationTests
+_HAS_DEEPAGENTS = importlib.util.find_spec("deepagents") is not None
+if _HAS_DEEPAGENTS:
+    pytest.register_assert_rewrite("langchain_tests.integration_tests.sandboxes")
+
+from langchain_tests.integration_tests.base_store import (
+    BaseStoreAsyncTests,
+    BaseStoreSyncTests,
+)
+from langchain_tests.integration_tests.cache import (
+    AsyncCacheTestSuite,
+    SyncCacheTestSuite,
+)
+from langchain_tests.integration_tests.chat_models import ChatModelIntegrationTests
+from langchain_tests.integration_tests.embeddings import EmbeddingsIntegrationTests
+from langchain_tests.integration_tests.retrievers import RetrieversIntegrationTests
+from langchain_tests.integration_tests.tools import ToolsIntegrationTests
+from langchain_tests.integration_tests.vectorstores import VectorStoreIntegrationTests
+
+if _HAS_DEEPAGENTS:
+    from langchain_tests.integration_tests.sandboxes import (
+        SandboxIntegrationTests,
+    )
 
 __all__ = [
-    "ChatModelIntegrationTests",
-    "EmbeddingsIntegrationTests",
-    "ToolsIntegrationTests",
+    "AsyncCacheTestSuite",
     "BaseStoreAsyncTests",
     "BaseStoreSyncTests",
-    "AsyncCacheTestSuite",
-    "SyncCacheTestSuite",
-    "VectorStoreIntegrationTests",
+    "ChatModelIntegrationTests",
+    "EmbeddingsIntegrationTests",
     "RetrieversIntegrationTests",
+    "SyncCacheTestSuite",
+    "ToolsIntegrationTests",
+    "VectorStoreIntegrationTests",
 ]
+
+if _HAS_DEEPAGENTS:
+    __all__ += ["SandboxIntegrationTests"]

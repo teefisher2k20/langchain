@@ -1,35 +1,44 @@
-.PHONY: all format lint test tests test_watch integration_tests docker_tests help extended_tests
+.PHONY: all format lint type test tests test_watch integration_tests help extended_tests check_version
 
 # Default target executed when no arguments are given to make.
 all: help
 
 # Define a variable for the test file path.
 TEST_FILE ?= tests/unit_tests/
+PYTEST_EXTRA ?=
+
+.EXPORT_ALL_VARIABLES:
+UV_FROZEN = true
 
 test tests:
 	env \
 	-u LANGCHAIN_TRACING_V2 \
 	-u LANGCHAIN_API_KEY \
+	-u LANGSMITH_API_KEY \
 	-u LANGSMITH_TRACING \
 	-u LANGCHAIN_PROJECT \
-	poetry run pytest -n auto --disable-socket --allow-unix-socket $(TEST_FILE)
+	uv run --group test pytest -n auto --benchmark-disable $(PYTEST_EXTRA) --disable-socket --allow-unix-socket $(TEST_FILE)
 
 test_watch:
 	env \
 	-u LANGCHAIN_TRACING_V2 \
 	-u LANGCHAIN_API_KEY \
+	-u LANGSMITH_API_KEY \
 	-u LANGSMITH_TRACING \
 	-u LANGCHAIN_PROJECT \
-	poetry run ptw --snapshot-update --now . --disable-socket --allow-unix-socket -- -vv $(TEST_FILE)
+	uv run --group test ptw --snapshot-update --now . --disable-socket --allow-unix-socket -vv -- $(TEST_FILE)
 
 test_profile:
-	poetry run pytest -vv tests/unit_tests/ --profile-svg
+	uv run --group test pytest -vv tests/unit_tests/ --profile-svg
 
 check_imports: $(shell find langchain_core -name '*.py')
-	poetry run python ./scripts/check_imports.py $^
+	uv run --group test python ./scripts/check_imports.py $^
+
+check_version:
+	uv run python ./scripts/check_version.py
 
 extended_tests:
-	poetry run pytest --only-extended --disable-socket --allow-unix-socket $(TEST_FILE)
+	uv run --group test pytest --only-extended --disable-socket --allow-unix-socket $(TEST_FILE)
 
 
 ######################
@@ -44,22 +53,25 @@ lint_diff format_diff: PYTHON_FILES=$(shell git diff --relative=libs/core --name
 lint_package: PYTHON_FILES=langchain_core
 lint_tests: PYTHON_FILES=tests
 lint_tests: MYPY_CACHE=.mypy_cache_test
+UV_RUN_LINT = uv run --all-groups
+UV_RUN_TYPE = uv run --all-groups
+lint_package lint_tests: UV_RUN_LINT = uv run --group lint
 
 lint lint_diff lint_package lint_tests:
 	./scripts/lint_imports.sh
-	[ "$(PYTHON_FILES)" = "" ] || poetry run ruff check $(PYTHON_FILES)
-	[ "$(PYTHON_FILES)" = "" ] || poetry run ruff format $(PYTHON_FILES) --diff
-	[ "$(PYTHON_FILES)" = "" ] || mkdir -p $(MYPY_CACHE) && poetry run mypy $(PYTHON_FILES) --cache-dir $(MYPY_CACHE)
+	[ "$(PYTHON_FILES)" = "" ] || $(UV_RUN_LINT) ruff check $(PYTHON_FILES)
+	[ "$(PYTHON_FILES)" = "" ] || $(UV_RUN_LINT) ruff format $(PYTHON_FILES) --diff
+	[ "$(PYTHON_FILES)" = "" ] || mkdir -p $(MYPY_CACHE) && $(UV_RUN_TYPE) mypy $(PYTHON_FILES) --cache-dir $(MYPY_CACHE)
+
+type:
+	mkdir -p $(MYPY_CACHE) && $(UV_RUN_TYPE) mypy $(PYTHON_FILES) --cache-dir $(MYPY_CACHE)
 
 format format_diff:
-	[ "$(PYTHON_FILES)" = "" ] || poetry run ruff format $(PYTHON_FILES)
-	[ "$(PYTHON_FILES)" = "" ] || poetry run ruff check --fix $(PYTHON_FILES)
+	[ "$(PYTHON_FILES)" = "" ] || $(UV_RUN_LINT) ruff format $(PYTHON_FILES)
+	[ "$(PYTHON_FILES)" = "" ] || $(UV_RUN_LINT) ruff check --fix $(PYTHON_FILES)
 
-spell_check:
-	poetry run codespell --toml pyproject.toml
-
-spell_fix:
-	poetry run codespell --toml pyproject.toml -w
+benchmark:
+	uv run pytest tests/benchmarks --codspeed
 
 ######################
 # HELP
@@ -69,6 +81,8 @@ help:
 	@echo '----'
 	@echo 'format                       - run code formatters'
 	@echo 'lint                         - run linters'
+	@echo 'type                         - run type checking'
+	@echo 'check_version                - validate version consistency'
 	@echo 'test                         - run unit tests'
 	@echo 'tests                        - run unit tests'
 	@echo 'test TEST_FILE=<test_file>   - run all tests in file'

@@ -1,7 +1,8 @@
+from __future__ import annotations
+
 import importlib.metadata
 import importlib.util
 import operator as op
-from typing import Union
 
 from packaging import version
 
@@ -42,26 +43,27 @@ _openvino_available = importlib.util.find_spec("openvino") is not None
 
 # This function was copied from: https://github.com/huggingface/accelerate/blob/874c4967d94badd24f893064cc3bef45f57cadf7/src/accelerate/utils/versions.py#L319
 def compare_versions(
-    library_or_version: Union[str, version.Version],
+    library_or_version: str | version.Version,
     operation: str,
     requirement_version: str,
 ) -> bool:
-    """
-    Compare a library version to some requirement using a given operation.
+    """Compare a library version to some requirement using a given operation.
 
-    Arguments:
-        library_or_version (`str` or `packaging.version.Version`):
+    Args:
+        library_or_version:
             A library name or a version to check.
-        operation (`str`):
+        operation:
             A string representation of an operator, such as `">"` or `"<="`.
-        requirement_version (`str`):
+        requirement_version:
             The version to compare the library version against
+
     """
-    if operation not in STR_OPERATION_TO_FUNC.keys():
-        raise ValueError(
+    if operation not in STR_OPERATION_TO_FUNC:
+        msg = (
             f"`operation` must be one of {list(STR_OPERATION_TO_FUNC.keys())}"
             f", received {operation}"
         )
+        raise ValueError(msg)
     if isinstance(library_or_version, str):
         library_or_version = version.parse(
             importlib.metadata.version(library_or_version)
@@ -88,9 +90,7 @@ def is_openvino_available() -> bool:
 
 
 def is_optimum_version(operation: str, reference_version: str) -> bool:
-    """
-    Compare the current Optimum version to a given reference with an operation.
-    """
+    """Compare the current Optimum version to a given reference with an operation."""
     if not _optimum_version:
         return False
     return compare_versions(
@@ -99,9 +99,7 @@ def is_optimum_version(operation: str, reference_version: str) -> bool:
 
 
 def is_optimum_intel_version(operation: str, reference_version: str) -> bool:
-    """
-    Compare the current Optimum Intel version to a given reference with an operation.
-    """
+    """Compare current Optimum Intel version to a given reference with an operation."""
     if not _optimum_intel_version:
         return False
     return compare_versions(

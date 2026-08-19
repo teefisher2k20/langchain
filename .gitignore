@@ -1,6 +1,8 @@
 .vs/
-.vscode/
+.claude/
 .idea/
+#Emacs backup
+*~
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
@@ -59,6 +61,7 @@ coverage.xml
 *.py,cover
 .hypothesis/
 .pytest_cache/
+.codspeed/
 
 # Translations
 *.mo
@@ -76,10 +79,6 @@ instance/
 
 # Scrapy stuff:
 .scrapy
-
-# Sphinx documentation
-docs/_build/
-docs/docs/_build/
 
 # PyBuilder
 target/
@@ -114,7 +113,36 @@ celerybeat.pid
 
 # Environments
 .env
+.env.*
+!.env.example
 .envrc
+*.pem
+*.key
+*.crt
+credentials.json
+# SSH private keys (no file extension, so *.key never matches them)
+id_rsa
+id_dsa
+id_ecdsa
+id_ed25519
+*_rsa
+*_dsa
+*_ecdsa
+*_ed25519
+!*.pub
+
+# Keystores
+*.p12
+*.pfx
+*.jks
+
+# Tokens, cookie jars, and git credential stores
+token.json
+Cookies
+Cookies.db
+cookies.sqlite
+cookies.txt
+.git-credentials
 .venv*
 venv*
 env/
@@ -161,25 +189,9 @@ data_map*
 *replit*
 
 node_modules
-docs/.yarn/
-docs/node_modules/
-docs/.docusaurus/
-docs/.cache-loader/
-docs/_dist
-docs/api_reference/*api_reference.rst
-docs/api_reference/*.md
-docs/api_reference/_build
-docs/api_reference/*/
-!docs/api_reference/_static/
-!docs/api_reference/templates/
-!docs/api_reference/themes/
-!docs/api_reference/_extensions/
-!docs/api_reference/scripts/
-docs/docs/build
-docs/docs/node_modules
-docs/docs/yarn.lock
-_dist
-docs/docs/templates
 
 prof
 virtualenv/
+scratch/
+
+.langgraph_api/

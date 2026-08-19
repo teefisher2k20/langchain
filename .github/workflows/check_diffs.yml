@@ -1,5 +1,17 @@
----
-name: CI
+# Primary CI workflow.
+#
+# Only runs against packages that have changed files.
+#
+# Runs:
+# - Linting (_lint.yml)
+# - Unit Tests (_test.yml)
+# - Pydantic compatibility tests (_test_pydantic.yml)
+# - Integration test compilation checks (_compile_integration_test.yml)
+# - Extended test suites that require additional dependencies
+#
+# Reports status to GitHub checks and PR status.
+
+name: "🔧 CI"
 
 on:
   push:
@@ -7,44 +19,61 @@ on:
   pull_request:
   merge_group:
 
+# Optimizes CI performance by canceling redundant workflow runs
 # If another push to the same PR or branch happens while this workflow is still running,
 # cancel the earlier run in favor of the next run.
 #
 # There's no point in testing an outdated version of the code. GitHub only allows
-# a limited number of job runners to be active at the same time, so it's better to cancel
-# pointless jobs early so that more useful jobs can run sooner.
+# a limited number of job runners to be active at the same time, so it's better to
+# cancel pointless jobs early so that more useful jobs can run sooner.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+
 env:
-  POETRY_VERSION: "1.8.4"
+  UV_FROZEN: "true"
+  UV_NO_SYNC: "true"
 
 jobs:
+  # This job analyzes which files changed and creates a dynamic test matrix
+  # to only run tests/lints for the affected packages, improving CI efficiency
   build:
+    name: "Detect Changes & Set Matrix"
     runs-on: ubuntu-latest
+    if: ${{ !contains(github.event.pull_request.labels.*.name, 'ci-ignore') }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - name: "📋 Checkout Code"
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+      - name: "🐍 Setup Python 3.11"
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
-          python-version: '3.11'
-      - id: files
-        uses: Ana06/get-changed-files@v2.2.0
-      - id: set-matrix
+          python-version: "3.11"
+      - name: "📂 Get Changed Files"
+        id: files
+        uses: Ana06/get-changed-files@25f79e676e7ea1868813e21465014798211fad8c # v2.3.0
+        with:
+          format: json
+      - name: "🔍 Analyze Changed Files & Generate Build Matrix"
+        id: set-matrix
+        env:
+          ALL_CHANGED_FILES: ${{ steps.files.outputs.all }}
         run: |
           python -m pip install packaging requests
-          python .github/scripts/check_diff.py ${{ steps.files.outputs.all }} >> $GITHUB_OUTPUT
+          python .github/scripts/check_diff.py "$ALL_CHANGED_FILES" >> $GITHUB_OUTPUT
     outputs:
       lint: ${{ steps.set-matrix.outputs.lint }}
       test: ${{ steps.set-matrix.outputs.test }}
       extended-tests: ${{ steps.set-matrix.outputs.extended-tests }}
       compile-integration-tests: ${{ steps.set-matrix.outputs.compile-integration-tests }}
       dependencies: ${{ steps.set-matrix.outputs.dependencies }}
-      test-doc-imports: ${{ steps.set-matrix.outputs.test-doc-imports }}
       test-pydantic: ${{ steps.set-matrix.outputs.test-pydantic }}
+      vcr-tests: ${{ steps.set-matrix.outputs.vcr-tests }}
+  # Run linting only on packages that have changed files
   lint:
-    name: cd ${{ matrix.job-configs.working-directory }}
-    needs: [ build ]
+    needs: [build]
     if: ${{ needs.build.outputs.lint != '[]' }}
     strategy:
       matrix:
@@ -56,9 +85,9 @@ jobs:
       python-version: ${{ matrix.job-configs.python-version }}
     secrets: inherit
 
+  # Run unit tests only on packages that have changed files
   test:
-    name: cd ${{ matrix.job-configs.working-directory }}
-    needs: [ build ]
+    needs: [build]
     if: ${{ needs.build.outputs.test != '[]' }}
     strategy:
       matrix:
@@ -70,9 +99,9 @@ jobs:
       python-version: ${{ matrix.job-configs.python-version }}
     secrets: inherit
 
+  # Test compatibility with different Pydantic versions for affected packages
   test-pydantic:
-    name: cd ${{ matrix.job-configs.working-directory }}
-    needs: [ build ]
+    needs: [build]
     if: ${{ needs.build.outputs.test-pydantic != '[]' }}
     strategy:
       matrix:
@@ -84,21 +113,10 @@ jobs:
       pydantic-version: ${{ matrix.job-configs.pydantic-version }}
     secrets: inherit
 
-  test-doc-imports:
-    needs: [ build ]
-    if: ${{ needs.build.outputs.test-doc-imports != '[]' }}
-    strategy:
-      matrix:
-        job-configs: ${{ fromJson(needs.build.outputs.test-doc-imports) }}
-      fail-fast: false
-    uses: ./.github/workflows/_test_doc_imports.yml
-    secrets: inherit
-    with:
-      python-version: ${{ matrix.job-configs.python-version }}
-
+  # Verify integration tests compile without actually running them (faster feedback)
   compile-integration-tests:
-    name: cd ${{ matrix.job-configs.working-directory }}
-    needs: [ build ]
+    name: "Compile Integration Tests"
+    needs: [build]
     if: ${{ needs.build.outputs.compile-integration-tests != '[]' }}
     strategy:
       matrix:
@@ -110,9 +128,25 @@ jobs:
       python-version: ${{ matrix.job-configs.python-version }}
     secrets: inherit
 
+  # Run VCR cassette-backed integration tests in playback-only mode (no API keys)
+  vcr-tests:
+    name: "VCR Cassette Tests"
+    needs: [build]
+    if: ${{ needs.build.outputs.vcr-tests != '[]' }}
+    strategy:
+      matrix:
+        job-configs: ${{ fromJson(needs.build.outputs.vcr-tests) }}
+      fail-fast: false
+    uses: ./.github/workflows/_test_vcr.yml
+    with:
+      working-directory: ${{ matrix.job-configs.working-directory }}
+      python-version: ${{ matrix.job-configs.python-version }}
+    secrets: inherit
+
+  # Run extended test suites that require additional dependencies
   extended-tests:
-    name: "cd ${{ matrix.job-configs.working-directory }} / make extended_tests #${{ matrix.job-configs.python-version }}"
-    needs: [ build ]
+    name: "Extended Tests"
+    needs: [build]
     if: ${{ needs.build.outputs.extended-tests != '[]' }}
     strategy:
       matrix:
@@ -125,28 +159,25 @@ jobs:
       run:
         working-directory: ${{ matrix.job-configs.working-directory }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
 
-      - name: Set up Python ${{ matrix.job-configs.python-version }} + Poetry ${{ env.POETRY_VERSION }}
-        uses: "./.github/actions/poetry_setup"
+      - name: "🐍 Set up Python ${{ matrix.job-configs.python-version }} + UV"
+        uses: "./.github/actions/uv_setup"
         with:
           python-version: ${{ matrix.job-configs.python-version }}
-          poetry-version: ${{ env.POETRY_VERSION }}
+          cache-suffix: extended-tests-${{ matrix.job-configs.working-directory }}
           working-directory: ${{ matrix.job-configs.working-directory }}
-          cache-key: extended
 
-      - name: Install dependencies
+      - name: "📦 Install Dependencies & Run Extended Tests"
         shell: bash
         run: |
-          echo "Running extended tests, installing dependencies with poetry..."
-          poetry install --with test
-          poetry run pip install uv
-          poetry run uv pip install -r extended_testing_deps.txt
+          echo "Running extended tests, installing dependencies with uv..."
+          uv venv
+          uv sync --group test
+          VIRTUAL_ENV=.venv uv pip install -r extended_testing_deps.txt
+          VIRTUAL_ENV=.venv make extended_tests
 
-      - name: Run extended tests
-        run: make extended_tests
-
-      - name: Ensure the tests did not create any additional files
+      - name: "🧹 Verify Clean Working Directory"
         shell: bash
         run: |
           set -eu
@@ -157,9 +188,37 @@ jobs:
           # grep will exit non-zero if the target message isn't found,
           # and `set -e` above will cause the step to fail.
           echo "$STATUS" | grep 'nothing to commit, working tree clean'
+
+  # Verify _release.yml dropdown options stay in sync with package directories
+  check-release-options:
+    name: "Validate Release Options"
+    if: github.repository_owner == 'langchain-ai'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+      - name: "🐍 Setup Python 3.11"
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11"
+      - name: "📦 Install Dependencies"
+        run: python -m pip install pyyaml pytest
+      - name: "🔍 Check release dropdown matches packages"
+        run: python -m pytest .github/scripts/test_release_options.py -v
+
+  # Final status check - ensures all required jobs passed before allowing merge
   ci_success:
-    name: "CI Success"
-    needs: [build, lint, test, compile-integration-tests, extended-tests, test-doc-imports, test-pydantic]
+    name: "✅ CI Success"
+    needs:
+      [
+        build,
+        lint,
+        test,
+        compile-integration-tests,
+        vcr-tests,
+        extended-tests,
+        test-pydantic,
+        check-release-options,
+      ]
     if: |
       always()
     runs-on: ubuntu-latest
@@ -168,7 +227,7 @@ jobs:
       RESULTS_JSON: ${{ toJSON(needs.*.result) }}
       EXIT_CODE: ${{!contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled') && '0' || '1'}}
     steps:
-      - name: "CI Success"
+      - name: "🎉 All Checks Passed"
         run: |
           echo $JOBS_JSON
           echo $RESULTS_JSON

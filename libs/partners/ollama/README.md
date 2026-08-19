@@ -1,44 +1,37 @@
 # langchain-ollama
 
-This package contains the LangChain integration with Ollama
+[![PyPI - Version](https://img.shields.io/pypi/v/langchain-ollama?label=%20)](https://pypi.org/project/langchain-ollama/#history)
+[![PyPI - License](https://img.shields.io/pypi/l/langchain-ollama)](https://opensource.org/licenses/MIT)
+[![PyPI - Downloads](https://img.shields.io/pepy/dt/langchain-ollama)](https://pypistats.org/packages/langchain-ollama)
+[![Twitter](https://img.shields.io/twitter/url/https/twitter.com/langchain_oss.svg?style=social&label=Follow%20%40LangChain)](https://x.com/langchain_oss)
 
-## Installation
+Looking for the JS/TS version? Check out [LangChain.js](https://github.com/langchain-ai/langchainjs).
+
+## Quick Install
 
 ```bash
-pip install -U langchain-ollama
+uv add langchain-ollama
 ```
 
-You will also need to run the Ollama server locally. 
-You can download it [here](https://ollama.com/download).
+## 🤔 What is this?
 
-## Chat Models
+This package contains the LangChain integration with Ollama
 
-`ChatOllama` class exposes chat models from Ollama.
+## 📖 Documentation
 
-```python
-from langchain_ollama import ChatOllama
+For full documentation, see the [API reference](https://reference.langchain.com/python/integrations/langchain_ollama/). For conceptual guides, tutorials, and examples on using these classes, see the [LangChain Docs](https://docs.langchain.com/oss/python/integrations/providers/ollama).
 
-llm = ChatOllama(model="llama3-groq-tool-use")
-llm.invoke("Sing a ballad of LangChain.")
-```
+## 📕 Releases & Versioning
 
-## Embeddings
+See our [Releases](https://docs.langchain.com/oss/python/release-policy) and [Versioning](https://docs.langchain.com/oss/python/versioning) policies.
 
-`OllamaEmbeddings` class exposes embeddings from Ollama.
+## 💁 Contributing
 
-```python
-from langchain_ollama import OllamaEmbeddings
+As an open-source project in a rapidly developing field, we are extremely open to contributions, whether it be in the form of a new feature, improved infrastructure, or better documentation.
 
-embeddings = OllamaEmbeddings(model="llama3")
-embeddings.embed_query("What is the meaning of life?")
-```
+For detailed information on how to contribute, see the [Contributing Guide](https://docs.langchain.com/oss/python/contributing/overview).
 
-## LLMs
-`OllamaLLM` class exposes LLMs from Ollama.
+## Resources
 
-```python
-from langchain_ollama import OllamaLLM
-
-llm = OllamaLLM(model="llama3")
-llm.invoke("The meaning of life is")
-```
+- [LangChain Academy](https://academy.langchain.com/) — comprehensive, free courses on LangChain libraries and products, made by the LangChain team
+- [Code of Conduct](https://github.com/langchain-ai/langchain/?tab=coc-ov-file) — community guidelines and standards

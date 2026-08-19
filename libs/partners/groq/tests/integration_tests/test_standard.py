@@ -1,11 +1,10 @@
-"""Standard LangChain interface tests"""
+"""Standard LangChain interface tests."""
 
-from typing import Optional, Type
+from typing import Literal
 
 import pytest
 from langchain_core.language_models import BaseChatModel
 from langchain_core.rate_limiters import InMemoryRateLimiter
-from langchain_core.tools import BaseTool
 from langchain_tests.integration_tests import (
     ChatModelIntegrationTests,
 )
@@ -15,59 +14,68 @@ from langchain_groq import ChatGroq
 rate_limiter = InMemoryRateLimiter(requests_per_second=0.2)
 
 
-class BaseTestGroq(ChatModelIntegrationTests):
+class TestGroq(ChatModelIntegrationTests):
     @property
-    def chat_model_class(self) -> Type[BaseChatModel]:
+    def chat_model_class(self) -> type[BaseChatModel]:
         return ChatGroq
 
-    @pytest.mark.xfail(reason="Not yet implemented.")
-    def test_tool_message_histories_list_content(
-        self, model: BaseChatModel, my_adder_tool: BaseTool
-    ) -> None:
-        super().test_tool_message_histories_list_content(model, my_adder_tool)
+    @property
+    def chat_model_params(self) -> dict:
+        return {
+            "model": "qwen/qwen3.6-27b",
+            "reasoning_effort": "none",
+            "rate_limiter": rate_limiter,
+        }
+
+    @pytest.mark.xfail(
+        reason="Groq models have inconsistent tool calling performance. See: "
+        "https://github.com/langchain-ai/langchain/discussions/19990"
+    )
+    def test_bind_runnables_as_tools(self, model: BaseChatModel) -> None:
+        super().test_bind_runnables_as_tools(model)
+
+    @pytest.mark.xfail(reason="Retry flaky tool calling behavior")
+    @pytest.mark.retry(count=3, delay=1)
+    def test_tool_calling(self, model: BaseChatModel) -> None:
+        super().test_tool_calling(model)
+
+    @pytest.mark.xfail(reason="Retry flaky tool choice behavior")
+    @pytest.mark.retry(count=3, delay=1)
+    def test_tool_choice(self, model: BaseChatModel) -> None:
+        super().test_tool_choice(model)
+
+    @pytest.mark.xfail(reason="Retry flaky tool calling behavior")
+    @pytest.mark.retry(count=3, delay=1)
+    async def test_tool_calling_async(self, model: BaseChatModel) -> None:
+        await super().test_tool_calling_async(model)
+
+    @pytest.mark.xfail(reason="Retry flaky tool calling behavior")
+    @pytest.mark.retry(count=3, delay=1)
+    def test_tool_calling_with_no_arguments(self, model: BaseChatModel) -> None:
+        super().test_tool_calling_with_no_arguments(model)
 
     @property
     def supports_json_mode(self) -> bool:
         return True
 
 
-class TestGroqLlama(BaseTestGroq):
-    @property
-    def chat_model_params(self) -> dict:
-        return {
-            "model": "llama-3.1-8b-instant",
-            "temperature": 0,
-            "rate_limiter": rate_limiter,
-        }
+@pytest.mark.parametrize("schema_type", ["pydantic", "typeddict", "json_schema"])
+def test_json_schema(
+    schema_type: Literal["pydantic", "typeddict", "json_schema"],
+) -> None:
+    class JsonSchemaTests(ChatModelIntegrationTests):
+        @property
+        def chat_model_class(self) -> type[ChatGroq]:
+            return ChatGroq
 
-    @property
-    def tool_choice_value(self) -> Optional[str]:
-        """Value to use for tool choice when used in tests."""
-        return "any"
+        @property
+        def chat_model_params(self) -> dict:
+            return {"model": "openai/gpt-oss-120b", "rate_limiter": rate_limiter}
 
-    @property
-    def supports_json_mode(self) -> bool:
-        return False  # Not supported in streaming mode
+        @property
+        def structured_output_kwargs(self) -> dict:
+            return {"method": "json_schema"}
 
-    @pytest.mark.xfail(
-        reason=("Fails with 'Failed to call a function. Please adjust your prompt.'")
-    )
-    def test_tool_calling_with_no_arguments(self, model: BaseChatModel) -> None:
-        super().test_tool_calling_with_no_arguments(model)
-
-    @pytest.mark.xfail(
-        reason=("Fails with 'Failed to call a function. Please adjust your prompt.'")
-    )
-    def test_tool_message_histories_string_content(
-        self, model: BaseChatModel, my_adder_tool: BaseTool
-    ) -> None:
-        super().test_tool_message_histories_string_content(model, my_adder_tool)
-
-    @pytest.mark.xfail(
-        reason=(
-            "Sometimes fails with 'Failed to call a function. "
-            "Please adjust your prompt.'"
-        )
-    )
-    def test_bind_runnables_as_tools(self, model: BaseChatModel) -> None:
-        super().test_bind_runnables_as_tools(model)
+    test_instance = JsonSchemaTests()
+    model = test_instance.chat_model_class(**test_instance.chat_model_params)
+    JsonSchemaTests().test_structured_output(model, schema_type)

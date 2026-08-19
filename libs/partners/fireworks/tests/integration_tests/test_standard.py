@@ -1,6 +1,4 @@
-"""Standard LangChain interface tests"""
-
-from typing import Type
+"""Standard LangChain interface tests."""
 
 import pytest
 from langchain_core.language_models import BaseChatModel
@@ -10,18 +8,20 @@ from langchain_tests.integration_tests import (  # type: ignore[import-not-found
 )
 
 from langchain_fireworks import ChatFireworks
+from tests.integration_tests._rate_limiter import rate_limiter
 
 
 class TestFireworksStandard(ChatModelIntegrationTests):
     @property
-    def chat_model_class(self) -> Type[BaseChatModel]:
+    def chat_model_class(self) -> type[BaseChatModel]:
         return ChatFireworks
 
     @property
     def chat_model_params(self) -> dict:
         return {
-            "model": "accounts/fireworks/models/llama-v3p1-70b-instruct",
+            "model": "accounts/fireworks/models/kimi-k2p6",
             "temperature": 0,
+            "rate_limiter": rate_limiter,
         }
 
     @pytest.mark.xfail(reason="Not yet implemented.")

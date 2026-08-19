@@ -1,9 +1,18 @@
 import time
-from typing import Optional as Optional
+
+import pytest
+from blockbuster import BlockBuster
 
 from langchain_core.caches import InMemoryCache
 from langchain_core.language_models import GenericFakeChatModel
+from langchain_core.load import dumps
 from langchain_core.rate_limiters import InMemoryRateLimiter
+
+
+@pytest.fixture(autouse=True)
+def deactivate_blockbuster(blockbuster: BlockBuster) -> None:
+    # Deactivate BlockBuster to not disturb the rate limiter timings
+    blockbuster.deactivate()
 
 
 def test_rate_limit_invoke() -> None:
@@ -205,9 +214,11 @@ def test_rate_limit_skips_cache() -> None:
     # cache key
     assert list(cache._cache) == [
         (
-            '[{"lc": 1, "type": "constructor", "id": ["langchain", "schema", '
-            '"messages", '
-            '"HumanMessage"], "kwargs": {"content": "foo", "type": "human"}}]',
+            (
+                '[{"lc": 1, "type": "constructor", "id": ["langchain", "schema", '
+                '"messages", "HumanMessage"], "kwargs": {"content": "foo", '
+                '"type": "human"}}]'
+            ),
             "[('_type', 'generic-fake-chat-model'), ('stop', None)]",
         )
     ]
@@ -219,13 +230,8 @@ class SerializableModel(GenericFakeChatModel):
         return True
 
 
-SerializableModel.model_rebuild()
-
-
 def test_serialization_with_rate_limiter() -> None:
     """Test model serialization with rate limiter."""
-    from langchain_core.load import dumps
-
     model = SerializableModel(
         messages=iter(["hello", "world", "!"]),
         rate_limiter=InMemoryRateLimiter(
@@ -236,7 +242,8 @@ def test_serialization_with_rate_limiter() -> None:
     assert InMemoryRateLimiter.__name__ not in serialized_model
 
 
-async def test_rate_limit_skips_cache_async() -> None:
+@pytest.mark.parametrize("output_version", ["v0", "v1"])
+async def test_rate_limit_skips_cache_async(output_version: str) -> None:
     """Test that rate limiting does not rate limit cache look ups."""
     cache = InMemoryCache()
     model = GenericFakeChatModel(
@@ -245,6 +252,7 @@ async def test_rate_limit_skips_cache_async() -> None:
             requests_per_second=20, check_every_n_seconds=0.1, max_bucket_size=1
         ),
         cache=cache,
+        output_version=output_version,
     )
 
     tic = time.time()

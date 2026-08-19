@@ -1,8 +1,9 @@
 """Test text splitters that require an integration."""
 
-from typing import Any
+from typing import TYPE_CHECKING, cast
 
 import pytest
+from transformers.models.auto.tokenization_auto import AutoTokenizer
 
 from langchain_text_splitters import (
     TokenTextSplitter,
@@ -12,29 +13,30 @@ from langchain_text_splitters.sentence_transformers import (
     SentenceTransformersTokenTextSplitter,
 )
 
-
-@pytest.fixture()
-def sentence_transformers() -> Any:
-    try:
-        import sentence_transformers
-    except ImportError:
-        pytest.skip("SentenceTransformers not installed.")
-    return sentence_transformers
+if TYPE_CHECKING:
+    from transformers import PreTrainedTokenizerBase
 
 
 def test_huggingface_type_check() -> None:
     """Test that type checks are done properly on input."""
-    with pytest.raises(ValueError):
-        CharacterTextSplitter.from_huggingface_tokenizer("foo")
+    with pytest.raises(
+        ValueError,
+        match="Tokenizer received was not an instance of PreTrainedTokenizerBase",
+    ):
+        CharacterTextSplitter.from_huggingface_tokenizer("foo")  # ty: ignore[invalid-argument-type]
 
 
 def test_huggingface_tokenizer() -> None:
     """Test text splitter that uses a HuggingFace tokenizer."""
-    from transformers import GPT2TokenizerFast
-
-    tokenizer = GPT2TokenizerFast.from_pretrained("gpt2")
+    tokenizer = AutoTokenizer.from_pretrained("gpt2")
     text_splitter = CharacterTextSplitter.from_huggingface_tokenizer(
-        tokenizer, separator=" ", chunk_size=1, chunk_overlap=0
+        # AutoTokenizer.from_pretrained returns a backend union
+        # (TokenizersBackend | SentencePieceBackend) that ty won't narrow to
+        # PreTrainedTokenizerBase, so cast to satisfy from_huggingface_tokenizer.
+        cast("PreTrainedTokenizerBase", tokenizer),
+        separator=" ",
+        chunk_size=1,
+        chunk_overlap=0,
     )
     output = text_splitter.split_text("foo bar")
     assert output == ["foo", "bar"]
@@ -57,13 +59,29 @@ def test_token_text_splitter_overlap() -> None:
 
 
 def test_token_text_splitter_from_tiktoken() -> None:
-    splitter = TokenTextSplitter.from_tiktoken_encoder(model_name="gpt-3.5-turbo")
-    expected_tokenizer = "cl100k_base"
+    splitter = TokenTextSplitter.from_tiktoken_encoder(model_name="gpt-4.1-mini")
+    expected_tokenizer = "o200k_base"
     actual_tokenizer = splitter._tokenizer.name
     assert expected_tokenizer == actual_tokenizer
 
 
-def test_sentence_transformers_count_tokens(sentence_transformers: Any) -> None:
+def test_character_text_splitter_from_tiktoken() -> None:
+    """The base (non-`TokenTextSplitter`) `from_tiktoken_encoder` path.
+
+    Verifies that a plain `CharacterTextSplitter` gets a token-based length
+    function wired in, without the tiktoken configuration leaking into a
+    constructor that does not accept it.
+    """
+    splitter = CharacterTextSplitter.from_tiktoken_encoder(
+        encoding_name="gpt2", chunk_size=5, chunk_overlap=0
+    )
+    # Length is measured in tokens, not characters: "abcdef" is 2 gpt2 tokens,
+    # so the 30-character string below is 10 tokens.
+    assert splitter._length_function("abcdef" * 5) == 10
+
+
+@pytest.mark.requires("sentence_transformers")
+def test_sentence_transformers_count_tokens() -> None:
     splitter = SentenceTransformersTokenTextSplitter(
         model_name="sentence-transformers/paraphrase-albert-small-v2"
     )
@@ -78,7 +96,8 @@ def test_sentence_transformers_count_tokens(sentence_transformers: Any) -> None:
     assert expected_token_count == token_count
 
 
-def test_sentence_transformers_split_text(sentence_transformers: Any) -> None:
+@pytest.mark.requires("sentence_transformers")
+def test_sentence_transformers_split_text() -> None:
     splitter = SentenceTransformersTokenTextSplitter(
         model_name="sentence-transformers/paraphrase-albert-small-v2"
     )
@@ -88,8 +107,10 @@ def test_sentence_transformers_split_text(sentence_transformers: Any) -> None:
     assert expected_text_chunks == text_chunks
 
 
-def test_sentence_transformers_multiple_tokens(sentence_transformers: Any) -> None:
+@pytest.mark.requires("sentence_transformers")
+def test_sentence_transformers_multiple_tokens() -> None:
     splitter = SentenceTransformersTokenTextSplitter(chunk_overlap=0)
+    assert splitter.maximum_tokens_per_chunk is not None
     text = "Lorem "
 
     text_token_count_including_start_and_stop_tokens = splitter.count_tokens(text=text)
@@ -118,3 +139,22 @@ def test_sentence_transformers_multiple_tokens(sentence_transformers: Any) -> No
         - splitter.maximum_tokens_per_chunk
     )
     assert expected == actual
+
+
+@pytest.mark.requires("sentence_transformers")
+def test_sentence_transformers_with_additional_model_kwargs() -> None:
+    """Test passing model_kwargs to SentenceTransformer."""
+    # ensure model is downloaded (online)
+    splitter_online = SentenceTransformersTokenTextSplitter(
+        model_name="sentence-transformers/paraphrase-albert-small-v2"
+    )
+    text = "lorem ipsum"
+    splitter_online.count_tokens(text=text)
+
+    # test offline model loading using model_kwargs
+    splitter_offline = SentenceTransformersTokenTextSplitter(
+        model_name="sentence-transformers/paraphrase-albert-small-v2",
+        model_kwargs={"local_files_only": True},
+    )
+    splitter_offline.count_tokens(text=text)
+    assert splitter_offline.tokenizer is not None

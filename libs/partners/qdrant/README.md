@@ -1,25 +1,27 @@
 # langchain-qdrant
 
-This package contains the LangChain integration with [Qdrant](https://qdrant.tech/).
+[![PyPI - Version](https://img.shields.io/pypi/v/langchain-qdrant?label=%20)](https://pypi.org/project/langchain-qdrant/#history)
+[![PyPI - License](https://img.shields.io/pypi/l/langchain-qdrant)](https://opensource.org/licenses/MIT)
+[![PyPI - Downloads](https://img.shields.io/pepy/dt/langchain-qdrant)](https://pypistats.org/packages/langchain-qdrant)
+[![Twitter](https://img.shields.io/twitter/url/https/twitter.com/langchain_oss.svg?style=social&label=Follow%20%40LangChain)](https://x.com/langchain_oss)
 
-## Installation
+Looking for the JS/TS version? Check out [LangChain.js](https://github.com/langchain-ai/langchainjs).
+
+## Quick Install
 
 ```bash
-pip install -U langchain-qdrant
+uv add langchain-qdrant
 ```
 
-## Usage
+## 🤔 What is this?
 
-The `Qdrant` class exposes the connection to the Qdrant vector store.
+This package contains the LangChain integration with [Qdrant](https://qdrant.tech/).
 
-```python
-from langchain_qdrant import Qdrant
+## 📖 Documentation
 
-embeddings = ... # use a LangChain Embeddings class
+View the [documentation](https://docs.langchain.com/oss/python/integrations/providers/qdrant) for more details.
 
-vectorstore = Qdrant.from_existing_collection(
-    embeddings=embeddings,
-    collection_name="<COLLECTION_NAME>",
-    url="http://localhost:6333",
-)
-```
+## Resources
+
+- [LangChain Academy](https://academy.langchain.com/) — comprehensive, free courses on LangChain libraries and products, made by the LangChain team
+- [Code of Conduct](https://github.com/langchain-ai/langchain/?tab=coc-ov-file) — community guidelines and standards

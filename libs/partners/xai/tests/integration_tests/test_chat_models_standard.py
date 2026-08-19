@@ -1,59 +1,82 @@
 """Standard LangChain interface tests"""
 
-from typing import Optional, Type
+from __future__ import annotations
 
-import pytest  # type: ignore[import-not-found]
-from langchain_core.language_models import BaseChatModel
+from typing import TYPE_CHECKING
+
+import pytest
+from langchain_core.messages import AIMessage
 from langchain_core.rate_limiters import InMemoryRateLimiter
-from langchain_core.tools import BaseTool
 from langchain_tests.integration_tests import (  # type: ignore[import-not-found]
     ChatModelIntegrationTests,  # type: ignore[import-not-found]
 )
+from typing_extensions import override
 
 from langchain_xai import ChatXAI
 
-# Initialize the rate limiter in global scope, so it can be re-used
-# across tests.
+if TYPE_CHECKING:
+    from langchain_core.language_models import BaseChatModel
+
+# Initialize the rate limiter in global scope, so it can be re-used across tests
 rate_limiter = InMemoryRateLimiter(
     requests_per_second=0.5,
 )
 
+MODEL_NAME = "grok-4-fast-reasoning"
+
 
 class TestXAIStandard(ChatModelIntegrationTests):
     @property
-    def chat_model_class(self) -> Type[BaseChatModel]:
+    def chat_model_class(self) -> type[BaseChatModel]:
         return ChatXAI
 
     @property
     def chat_model_params(self) -> dict:
         return {
-            "model": "grok-beta",
+            "model": MODEL_NAME,
+            "temperature": 0,
             "rate_limiter": rate_limiter,
         }
 
-    @property
-    def tool_choice_value(self) -> Optional[str]:
-        """Value to use for tool choice when used in tests."""
-        return "tool_name"
+    @pytest.mark.parametrize(
+        "model",
+        [
+            {},
+            pytest.param(
+                {"output_version": "v1"},
+                marks=pytest.mark.xfail(
+                    strict=True,
+                    reason=(
+                        "xAI v1 streaming aggregate does not surface tool_call "
+                        "content block; tool calls are only available via "
+                        "`.tool_calls`."
+                    ),
+                ),
+            ),
+        ],
+        indirect=True,
+    )
+    @override
+    def test_tool_calling(self, model: BaseChatModel) -> None:
+        """Parametrize across default and `v1` output versions; `v1` is xfailed."""
+        super().test_tool_calling(model)
 
-    @pytest.mark.xfail(reason="Not yet supported.")
-    def test_usage_metadata_streaming(self, model: BaseChatModel) -> None:
-        super().test_usage_metadata_streaming(model)
+    @pytest.mark.xfail(
+        reason="Default model does not support stop sequences, using grok-3 instead"
+    )
+    @override
+    def test_stop_sequence(self, model: BaseChatModel) -> None:
+        """Override to use `grok-3` which supports stop sequences."""
+        params = {**self.chat_model_params, "model": "grok-3"}
 
-    @pytest.mark.xfail(reason="Can't handle AIMessage with empty content.")
-    def test_tool_message_error_status(
-        self, model: BaseChatModel, my_adder_tool: BaseTool
-    ) -> None:
-        super().test_tool_message_error_status(model, my_adder_tool)
+        grok3_model = ChatXAI(**params)
 
-    @pytest.mark.xfail(reason="Can't handle AIMessage with empty content.")
-    def test_structured_few_shot_examples(
-        self, model: BaseChatModel, my_adder_tool: BaseTool
-    ) -> None:
-        super().test_structured_few_shot_examples(model, my_adder_tool)
+        result = grok3_model.invoke("hi", stop=["you"])
+        assert isinstance(result, AIMessage)
 
-    @pytest.mark.xfail(reason="Can't handle AIMessage with empty content.")
-    def test_tool_message_histories_string_content(
-        self, model: BaseChatModel, my_adder_tool: BaseTool
-    ) -> None:
-        super().test_tool_message_histories_string_content(model, my_adder_tool)
+        custom_model = ChatXAI(
+            **params,
+            stop_sequences=["you"],
+        )
+        result = custom_model.invoke("hi")
+        assert isinstance(result, AIMessage)

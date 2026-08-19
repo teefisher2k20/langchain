@@ -1,7 +1,10 @@
 import json
 
+import pytest
+
 from langchain_core.load import dump, loads
 from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.prompts.image import ImagePromptTemplate
 
 
 def test_image_prompt_template_deserializable() -> None:
@@ -11,7 +14,8 @@ def test_image_prompt_template_deserializable() -> None:
             ChatPromptTemplate.from_messages(
                 [("system", [{"type": "image", "image_url": "{img}"}])]
             )
-        )
+        ),
+        allowed_objects="core",
     )
 
 
@@ -105,5 +109,34 @@ def test_image_prompt_template_deserializable_old() -> None:
                     "input_variables": ["img", "input"],
                 },
             }
-        )
+        ),
+        allowed_objects="core",
     )
+
+
+def test_image_prompt_template_rejects_attribute_access_in_template_values() -> None:
+    with pytest.raises(ValueError, match="Variable names cannot contain attribute"):
+        ImagePromptTemplate(
+            input_variables=["image"],
+            template={"url": "https://example.com/{image.__class__.__name__}.png"},
+        )
+
+
+def test_image_prompt_template_deserialization_rejects_attribute_access() -> None:
+    payload = json.dumps(
+        {
+            "lc": 1,
+            "type": "constructor",
+            "id": ["langchain", "prompts", "image", "ImagePromptTemplate"],
+            "kwargs": {
+                "template": {
+                    "url": "https://example.com/{image.__class__.__name__}.png"
+                },
+                "input_variables": ["image"],
+                "template_format": "f-string",
+            },
+        }
+    )
+
+    with pytest.raises(ValueError, match="Variable names cannot contain attribute"):
+        loads(payload, allowed_objects=[ImagePromptTemplate])

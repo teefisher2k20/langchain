@@ -1,14 +1,12 @@
-from collections.abc import AsyncIterator, Iterator, Sequence
+from collections.abc import AsyncIterator, Callable, Iterator, Sequence
 from typing import (
     Any,
-    Callable,
-    Optional,
-    Union,
 )
 
 import pytest
 from pydantic import BaseModel
-from syrupy import SnapshotAssertion
+from syrupy.assertion import SnapshotAssertion
+from typing_extensions import override
 
 from langchain_core.callbacks import CallbackManagerForLLMRun
 from langchain_core.language_models import (
@@ -17,7 +15,7 @@ from langchain_core.language_models import (
     LanguageModelInput,
 )
 from langchain_core.load import dumps
-from langchain_core.messages import BaseMessage
+from langchain_core.messages import AIMessage, BaseMessage
 from langchain_core.outputs import ChatResult
 from langchain_core.prompts import PromptTemplate
 from langchain_core.runnables import (
@@ -30,18 +28,26 @@ from langchain_core.runnables import (
     RunnableWithFallbacks,
 )
 from langchain_core.tools import BaseTool
+from langchain_core.version import VERSION
 
 
-@pytest.fixture()
-def llm() -> RunnableWithFallbacks:
+def _normalize_lc_version(value: str) -> str:
+    return value.replace(
+        f"'langchain-core': '{VERSION}'",
+        "'langchain-core': '<version>'",
+    )
+
+
+@pytest.fixture
+def llm() -> RunnableWithFallbacks[Any, Any]:
     error_llm = FakeListLLM(responses=["foo"], i=1)
     pass_llm = FakeListLLM(responses=["bar"])
 
     return error_llm.with_fallbacks([pass_llm])
 
 
-@pytest.fixture()
-def llm_multi() -> RunnableWithFallbacks:
+@pytest.fixture
+def llm_multi() -> RunnableWithFallbacks[Any, Any]:
     error_llm = FakeListLLM(responses=["foo"], i=1)
     error_llm_2 = FakeListLLM(responses=["baz"], i=1)
     pass_llm = FakeListLLM(responses=["bar"])
@@ -49,8 +55,8 @@ def llm_multi() -> RunnableWithFallbacks:
     return error_llm.with_fallbacks([error_llm_2, pass_llm])
 
 
-@pytest.fixture()
-def chain() -> Runnable:
+@pytest.fixture
+def chain() -> Runnable[Any, str]:
     error_llm = FakeListLLM(responses=["foo"], i=1)
     pass_llm = FakeListLLM(responses=["bar"])
 
@@ -60,18 +66,18 @@ def chain() -> Runnable:
     )
 
 
-def _raise_error(inputs: dict) -> str:
+def _raise_error(_: dict[str, Any]) -> str:
     raise ValueError
 
 
-def _dont_raise_error(inputs: dict) -> str:
+def _dont_raise_error(inputs: dict[str, Any]) -> str:
     if "exception" in inputs:
         return "bar"
     raise ValueError
 
 
-@pytest.fixture()
-def chain_pass_exceptions() -> Runnable:
+@pytest.fixture
+def chain_pass_exceptions() -> Runnable[Any, str]:
     fallback = RunnableLambda(_dont_raise_error)
     return {"text": RunnablePassthrough()} | RunnableLambda(
         _raise_error
@@ -79,27 +85,36 @@ def chain_pass_exceptions() -> Runnable:
 
 
 @pytest.mark.parametrize(
-    "runnable",
+    "runnable_name",
     ["llm", "llm_multi", "chain", "chain_pass_exceptions"],
 )
-async def test_fallbacks(
-    runnable: RunnableWithFallbacks, request: Any, snapshot: SnapshotAssertion
+def test_fallbacks(
+    runnable_name: str, request: Any, snapshot: SnapshotAssertion
 ) -> None:
-    runnable = request.getfixturevalue(runnable)
+    runnable: Runnable[Any, Any] = request.getfixturevalue(runnable_name)
     assert runnable.invoke("hello") == "bar"
     assert runnable.batch(["hi", "hey", "bye"]) == ["bar"] * 3
     assert list(runnable.stream("hello")) == ["bar"]
+    assert _normalize_lc_version(dumps(runnable, pretty=True)) == snapshot
+
+
+@pytest.mark.parametrize(
+    "runnable_name",
+    ["llm", "llm_multi", "chain", "chain_pass_exceptions"],
+)
+async def test_fallbacks_async(runnable_name: str, request: Any) -> None:
+    runnable: Runnable[Any, Any] = request.getfixturevalue(runnable_name)
     assert await runnable.ainvoke("hello") == "bar"
     assert await runnable.abatch(["hi", "hey", "bye"]) == ["bar"] * 3
     assert list(await runnable.ainvoke("hello")) == list("bar")
-    assert dumps(runnable, pretty=True) == snapshot
 
 
-def _runnable(inputs: dict) -> str:
+def _runnable(inputs: dict[str, Any]) -> str:
     if inputs["text"] == "foo":
         return "first"
     if "exception" not in inputs:
-        raise ValueError
+        msg = "missing exception"
+        raise ValueError(msg)
     if inputs["text"] == "bar":
         return "second"
     if isinstance(inputs["exception"], ValueError):
@@ -107,8 +122,8 @@ def _runnable(inputs: dict) -> str:
     return "third"
 
 
-def _assert_potential_error(actual: list, expected: list) -> None:
-    for x, y in zip(actual, expected):
+def _assert_potential_error(actual: list[Any], expected: list[Any]) -> None:
+    for x, y in zip(actual, expected, strict=False):
         if isinstance(x, Exception):
             assert isinstance(y, type(x))
         else:
@@ -120,7 +135,7 @@ def test_invoke_with_exception_key() -> None:
     runnable_with_single = runnable.with_fallbacks(
         [runnable], exception_key="exception"
     )
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="missing exception"):
         runnable_with_single.invoke({"text": "baz"})
 
     actual = runnable_with_single.invoke({"text": "bar"})
@@ -141,7 +156,7 @@ async def test_ainvoke_with_exception_key() -> None:
     runnable_with_single = runnable.with_fallbacks(
         [runnable], exception_key="exception"
     )
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="missing exception"):
         await runnable_with_single.ainvoke({"text": "baz"})
 
     actual = await runnable_with_single.ainvoke({"text": "bar"})
@@ -158,7 +173,7 @@ async def test_ainvoke_with_exception_key() -> None:
 
 def test_batch() -> None:
     runnable = RunnableLambda(_runnable)
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="missing exception"):
         runnable.batch([{"text": "foo"}, {"text": "bar"}, {"text": "baz"}])
     actual = runnable.batch(
         [{"text": "foo"}, {"text": "bar"}, {"text": "baz"}], return_exceptions=True
@@ -202,7 +217,7 @@ def test_batch() -> None:
 
 async def test_abatch() -> None:
     runnable = RunnableLambda(_runnable)
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="missing exception"):
         await runnable.abatch([{"text": "foo"}, {"text": "bar"}, {"text": "baz"}])
     actual = await runnable.abatch(
         [{"text": "foo"}, {"text": "bar"}, {"text": "baz"}], return_exceptions=True
@@ -250,18 +265,22 @@ async def test_abatch() -> None:
     _assert_potential_error(actual, expected)
 
 
-def _generate(input: Iterator) -> Iterator[str]:
+def _generate(_: Iterator[Any]) -> Iterator[str]:
     yield from "foo bar"
 
 
-def _generate_immediate_error(input: Iterator) -> Iterator[str]:
-    raise ValueError
+def _error(msg: str) -> None:
+    raise ValueError(msg)
+
+
+def _generate_immediate_error(_: Iterator[Any]) -> Iterator[str]:
+    _error("immediate error")
     yield ""
 
 
-def _generate_delayed_error(input: Iterator) -> Iterator[str]:
+def _generate_delayed_error(_: Iterator[Any]) -> Iterator[str]:
     yield ""
-    raise ValueError
+    _error("delayed error")
 
 
 def test_fallbacks_stream() -> None:
@@ -270,26 +289,26 @@ def test_fallbacks_stream() -> None:
     )
     assert list(runnable.stream({})) == list("foo bar")
 
-    with pytest.raises(ValueError):
-        runnable = RunnableGenerator(_generate_delayed_error).with_fallbacks(
-            [RunnableGenerator(_generate)]
-        )
+    runnable = RunnableGenerator(_generate_delayed_error).with_fallbacks(
+        [RunnableGenerator(_generate)]
+    )
+    with pytest.raises(ValueError, match="delayed error"):
         list(runnable.stream({}))
 
 
-async def _agenerate(input: AsyncIterator) -> AsyncIterator[str]:
+async def _agenerate(_: AsyncIterator[Any]) -> AsyncIterator[str]:
     for c in "foo bar":
         yield c
 
 
-async def _agenerate_immediate_error(input: AsyncIterator) -> AsyncIterator[str]:
-    raise ValueError
+async def _agenerate_immediate_error(_: AsyncIterator[Any]) -> AsyncIterator[str]:
+    _error("immediate error")
     yield ""
 
 
-async def _agenerate_delayed_error(input: AsyncIterator) -> AsyncIterator[str]:
+async def _agenerate_delayed_error(_: AsyncIterator[Any]) -> AsyncIterator[str]:
     yield ""
-    raise ValueError
+    _error("delayed error")
 
 
 async def test_fallbacks_astream() -> None:
@@ -300,38 +319,42 @@ async def test_fallbacks_astream() -> None:
     async for c in runnable.astream({}):
         assert c == next(expected)
 
-    with pytest.raises(ValueError):
-        runnable = RunnableGenerator(_agenerate_delayed_error).with_fallbacks(
-            [RunnableGenerator(_agenerate)]
-        )
-        async for _ in runnable.astream({}):
-            pass
+    runnable = RunnableGenerator(_agenerate_delayed_error).with_fallbacks(
+        [RunnableGenerator(_agenerate)]
+    )
+    with pytest.raises(ValueError, match="delayed error"):
+        _ = [_ async for _ in runnable.astream({})]
 
 
 class FakeStructuredOutputModel(BaseChatModel):
     foo: int
 
+    @override
     def _generate(
         self,
         messages: list[BaseMessage],
-        stop: Optional[list[str]] = None,
-        run_manager: Optional[CallbackManagerForLLMRun] = None,
+        stop: list[str] | None = None,
+        run_manager: CallbackManagerForLLMRun | None = None,
         **kwargs: Any,
     ) -> ChatResult:
         """Top Level call."""
         return ChatResult(generations=[])
 
+    @override
     def bind_tools(
         self,
-        tools: Sequence[Union[dict[str, Any], type[BaseModel], Callable, BaseTool]],
+        tools: Sequence[
+            dict[str, Any] | type[BaseModel] | Callable[..., Any] | BaseTool
+        ],
         **kwargs: Any,
-    ) -> Runnable[LanguageModelInput, BaseMessage]:
+    ) -> Runnable[LanguageModelInput, AIMessage]:
         return self.bind(tools=tools)
 
+    @override
     def with_structured_output(
-        self, schema: Union[dict, type[BaseModel]], **kwargs: Any
-    ) -> Runnable[LanguageModelInput, Union[dict, BaseModel]]:
-        return RunnableLambda(lambda x: {"foo": self.foo})
+        self, schema: dict[str, Any] | type[BaseModel], **kwargs: Any
+    ) -> Runnable[LanguageModelInput, dict[str, int] | BaseModel]:
+        return RunnableLambda(lambda _: {"foo": self.foo})
 
     @property
     def _llm_type(self) -> str:
@@ -341,21 +364,25 @@ class FakeStructuredOutputModel(BaseChatModel):
 class FakeModel(BaseChatModel):
     bar: int
 
+    @override
     def _generate(
         self,
         messages: list[BaseMessage],
-        stop: Optional[list[str]] = None,
-        run_manager: Optional[CallbackManagerForLLMRun] = None,
+        stop: list[str] | None = None,
+        run_manager: CallbackManagerForLLMRun | None = None,
         **kwargs: Any,
     ) -> ChatResult:
         """Top Level call."""
         return ChatResult(generations=[])
 
+    @override
     def bind_tools(
         self,
-        tools: Sequence[Union[dict[str, Any], type[BaseModel], Callable, BaseTool]],
+        tools: Sequence[
+            dict[str, Any] | type[BaseModel] | Callable[..., Any] | BaseTool
+        ],
         **kwargs: Any,
-    ) -> Runnable[LanguageModelInput, BaseMessage]:
+    ) -> Runnable[LanguageModelInput, AIMessage]:
         return self.bind(tools=tools)
 
     @property

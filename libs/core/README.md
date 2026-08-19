@@ -1,90 +1,52 @@
 # 🦜🍎️ LangChain Core
 
-[![Downloads](https://static.pepy.tech/badge/langchain_core/month)](https://pepy.tech/project/langchain_core)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![PyPI - Version](https://img.shields.io/pypi/v/langchain-core?label=%20)](https://pypi.org/project/langchain-core/#history)
+[![PyPI - License](https://img.shields.io/pypi/l/langchain-core)](https://opensource.org/licenses/MIT)
+[![PyPI - Downloads](https://img.shields.io/pepy/dt/langchain-core)](https://pypistats.org/packages/langchain-core)
+[![Twitter](https://img.shields.io/twitter/url/https/twitter.com/langchain_oss.svg?style=social&label=Follow%20%40LangChain)](https://x.com/langchain_oss)
+
+Looking for the JS/TS version? Check out [LangChain.js](https://github.com/langchain-ai/langchainjs).
+
+To help you ship LangChain apps to production faster, check out [LangSmith](https://www.langchain.com/langsmith).
+[LangSmith](https://www.langchain.com/langsmith) is a unified developer platform for building, testing, and monitoring LLM applications.
 
 ## Quick Install
 
 ```bash
-pip install langchain-core
+uv add langchain-core
 ```
 
-## What is it?
+## 🤔 What is this?
 
-LangChain Core contains the base abstractions that power the rest of the LangChain ecosystem.
+LangChain Core contains the base abstractions that power the LangChain ecosystem.
 
-These abstractions are designed to be as modular and simple as possible. Examples of these abstractions include those for language models, document loaders, embedding models, vectorstores, retrievers, and more.
+These abstractions are designed to be as modular and simple as possible.
 
 The benefit of having these abstractions is that any provider can implement the required interface and then easily be used in the rest of the LangChain ecosystem.
 
-For full documentation see the [API reference](https://python.langchain.com/api_reference/core/index.html).
+## ⛰️ Why build on top of LangChain Core?
 
-## 1️⃣ Core Interface: Runnables
+The LangChain ecosystem is built on top of `langchain-core`. Some of the benefits:
 
-The concept of a Runnable is central to LangChain Core – it is the interface that most LangChain Core components implement, giving them
+- **Modularity**: We've designed Core around abstractions that are independent of each other, and not tied to any specific model provider.
+- **Stability**: We are committed to a stable versioning scheme, and will communicate any breaking changes with advance notice and version bumps.
+- **Battle-tested**: Core components have the largest install base in the LLM ecosystem, and are used in production by many companies.
 
-- a common invocation interface (invoke, batch, stream, etc.)
-- built-in utilities for retries, fallbacks, schemas and runtime configurability
-- easy deployment with [LangServe](https://github.com/langchain-ai/langserve)
+## 📖 Documentation
 
-For more check out the [runnable docs](https://python.langchain.com/docs/expression_language/interface). Examples of components that implement the interface include: LLMs, Chat Models, Prompts, Retrievers, Tools, Output Parsers.
-
-You can use LangChain Core objects in two ways:
-
-1. **imperative**, ie. call them directly, eg. `model.invoke(...)`
-
-2. **declarative**, with LangChain Expression Language (LCEL)
-
-3. or a mix of both! eg. one of the steps in your LCEL sequence can be a custom function
-
-| Feature   | Imperative                      | Declarative    |
-| --------- | ------------------------------- | -------------- |
-| Syntax    | All of Python                   | LCEL           |
-| Tracing   | ✅ – Automatic                  | ✅ – Automatic |
-| Parallel  | ✅ – with threads or coroutines | ✅ – Automatic |
-| Streaming | ✅ – by yielding                | ✅ – Automatic |
-| Async     | ✅ – by writing async functions | ✅ – Automatic |
-
-## ⚡️ What is LangChain Expression Language?
-
-LangChain Expression Language (LCEL) is a _declarative language_ for composing LangChain Core runnables into sequences (or DAGs), covering the most common patterns when building with LLMs.
-
-LangChain Core compiles LCEL sequences to an _optimized execution plan_, with automatic parallelization, streaming, tracing, and async support.
-
-For more check out the [LCEL docs](https://python.langchain.com/docs/expression_language/).
-
-![Diagram outlining the hierarchical organization of the LangChain framework, displaying the interconnected parts across multiple layers.](https://raw.githubusercontent.com/langchain-ai/langchain/master/docs/static/svg/langchain_stack_112024.svg "LangChain Framework Overview")
-
-For more advanced use cases, also check out [LangGraph](https://github.com/langchain-ai/langgraph), which is a graph-based runner for cyclic and recursive LLM workflows.
+For full documentation, see the [API reference](https://reference.langchain.com/python/langchain_core/). For conceptual guides, tutorials, and examples on using LangChain, see the [LangChain Docs](https://docs.langchain.com/oss/python/langchain/overview). You can also chat with the docs using [Chat LangChain](https://chat.langchain.com).
 
 ## 📕 Releases & Versioning
 
-`langchain-core` is currently on version `0.1.x`.
-
-As `langchain-core` contains the base abstractions and runtime for the whole LangChain ecosystem, we will communicate any breaking changes with advance notice and version bumps. The exception for this is anything in `langchain_core.beta`. The reason for `langchain_core.beta` is that given the rate of change of the field, being able to move quickly is still a priority, and this module is our attempt to do so.
-
-Minor version increases will occur for:
-
-- Breaking changes for any public interfaces NOT in `langchain_core.beta`
-
-Patch version increases will occur for:
-
-- Bug fixes
-- New features
-- Any changes to private interfaces
-- Any changes to `langchain_core.beta`
+See our [Releases](https://docs.langchain.com/oss/python/release-policy) and [Versioning](https://docs.langchain.com/oss/python/versioning) policies.
 
 ## 💁 Contributing
 
 As an open-source project in a rapidly developing field, we are extremely open to contributions, whether it be in the form of a new feature, improved infrastructure, or better documentation.
 
-For detailed information on how to contribute, see the [Contributing Guide](https://python.langchain.com/docs/contributing/).
+For detailed information on how to contribute, see the [Contributing Guide](https://docs.langchain.com/oss/python/contributing/overview).
 
-## ⛰️ Why build on top of LangChain Core?
+## Resources
 
-The whole LangChain ecosystem is built on top of LangChain Core, so you're in good company when building on top of it. Some of the benefits:
-
-- **Modularity**: LangChain Core is designed around abstractions that are independent of each other, and not tied to any specific model provider.
-- **Stability**: We are committed to a stable versioning scheme, and will communicate any breaking changes with advance notice and version bumps.
-- **Battle-tested**: LangChain Core components have the largest install base in the LLM ecosystem, and are used in production by many companies.
-- **Community**: LangChain Core is developed in the open, and we welcome contributions from the community.
+- [LangChain Academy](https://academy.langchain.com/) — comprehensive, free courses on LangChain libraries and products, made by the LangChain team
+- [Code of Conduct](https://github.com/langchain-ai/langchain/?tab=coc-ov-file) — community guidelines and standards

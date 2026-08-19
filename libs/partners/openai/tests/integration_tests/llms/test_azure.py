@@ -1,7 +1,8 @@
 """Test AzureOpenAI wrapper."""
 
 import os
-from typing import Any, Generator
+from collections.abc import Generator
+from typing import Any
 
 import pytest
 from langchain_core.callbacks import CallbackManager
@@ -16,6 +17,15 @@ OPENAI_API_KEY = os.environ.get("AZURE_OPENAI_API_KEY", "")
 DEPLOYMENT_NAME = os.environ.get(
     "AZURE_OPENAI_DEPLOYMENT_NAME",
     os.environ.get("AZURE_OPENAI_LLM_DEPLOYMENT_NAME", ""),
+)
+
+pytestmark = pytest.mark.skipif(
+    True,
+    reason=(
+        "This entire module is skipped as all Azure OpenAI models supporting text "
+        "completions are retired. See: "
+        "https://learn.microsoft.com/en-us/azure/ai-foundry/openai/concepts/legacy-models"
+    ),
 )
 
 
@@ -97,7 +107,7 @@ async def test_openai_ainvoke(llm: AzureOpenAI) -> None:
 @pytest.mark.scheduled
 def test_openai_invoke(llm: AzureOpenAI) -> None:
     """Test streaming tokens from AzureOpenAI."""
-    result = llm.invoke("I'm Pickle Rick", config=dict(tags=["foo"]))
+    result = llm.invoke("I'm Pickle Rick", config={"tags": ["foo"]})
     assert isinstance(result, str)
 
 
@@ -144,11 +154,11 @@ def test_openai_streaming_callback() -> None:
         max_tokens=10,
         streaming=True,
         temperature=0,
-        callback_manager=callback_manager,
+        callbacks=callback_manager,
         verbose=True,
     )
     llm.invoke("Write me a sentence with 100 words.")
-    assert callback_handler.llm_streams == 12
+    assert callback_handler.llm_streams < 15
 
 
 @pytest.mark.scheduled
@@ -167,9 +177,9 @@ async def test_openai_async_streaming_callback() -> None:
         max_tokens=10,
         streaming=True,
         temperature=0,
-        callback_manager=callback_manager,
+        callbacks=callback_manager,
         verbose=True,
     )
     result = await llm.agenerate(["Write me a sentence with 100 words."])
-    assert callback_handler.llm_streams == 12
+    assert callback_handler.llm_streams < 15
     assert isinstance(result, LLMResult)

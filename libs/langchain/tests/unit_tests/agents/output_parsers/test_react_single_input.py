@@ -1,8 +1,11 @@
+import signal
+import sys
+
 import pytest
 from langchain_core.agents import AgentAction, AgentFinish
 from langchain_core.exceptions import OutputParserException
 
-from langchain.agents.output_parsers.react_single_input import (
+from langchain_classic.agents.output_parsers.react_single_input import (
     ReActSingleInputOutputParser,
 )
 
@@ -15,7 +18,9 @@ Action: search
 Action Input: what is the temperature in SF?"""
     output = parser.invoke(_input)
     expected_output = AgentAction(
-        tool="search", tool_input="what is the temperature in SF?", log=_input
+        tool="search",
+        tool_input="what is the temperature in SF?",
+        log=_input,
     )
     assert output == expected_output
 
@@ -27,7 +32,8 @@ def test_finish() -> None:
 Final Answer: The temperature is 100"""
     output = parser.invoke(_input)
     expected_output = AgentFinish(
-        return_values={"output": "The temperature is 100"}, log=_input
+        return_values={"output": "The temperature is 100"},
+        log=_input,
     )
     assert output == expected_output
 
@@ -40,3 +46,32 @@ Action: search Final Answer:
 Action Input: what is the temperature in SF?"""
     with pytest.raises(OutputParserException):
         parser.invoke(_input)
+
+
+def _timeout_handler(_signum: int, _frame: object) -> None:
+    msg = "ReDoS: regex took too long"
+    raise TimeoutError(msg)
+
+
+@pytest.mark.skipif(
+    sys.platform == "win32", reason="SIGALRM is not available on Windows"
+)
+def test_react_single_input_no_redos() -> None:
+    """Regression test for ReDoS caused by catastrophic backtracking."""
+    parser = ReActSingleInputOutputParser()
+    malicious = "Action: " + " \t" * 1000 + "Action "
+    old = signal.signal(signal.SIGALRM, _timeout_handler)
+    signal.alarm(2)
+    try:
+        try:
+            parser.parse(malicious)
+        except OutputParserException:
+            pass
+        except TimeoutError:
+            pytest.fail(
+                "ReDoS detected: ReActSingleInputOutputParser.parse() "
+                "hung on crafted input"
+            )
+    finally:
+        signal.alarm(0)
+        signal.signal(signal.SIGALRM, old)

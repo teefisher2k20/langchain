@@ -1,3 +1,6 @@
+"""Hugging Face integration for LangChain."""
+
+from langchain_huggingface._version import __version__
 from langchain_huggingface.chat_models import (
     ChatHuggingFace,  # type: ignore[import-not-found]
 )
@@ -12,8 +15,9 @@ from langchain_huggingface.llms import (
 
 __all__ = [
     "ChatHuggingFace",
-    "HuggingFaceEndpointEmbeddings",
     "HuggingFaceEmbeddings",
     "HuggingFaceEndpoint",
+    "HuggingFaceEndpointEmbeddings",
     "HuggingFacePipeline",
+    "__version__",
 ]

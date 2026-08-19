@@ -1,4 +1,6 @@
 import inspect
+import subprocess
+import sys
 import warnings
 from typing import Any
 
@@ -6,14 +8,16 @@ import pytest
 from pydantic import BaseModel
 
 from langchain_core._api.deprecation import (
+    LangChainDeprecationWarning,
     deprecated,
     rename_parameter,
+    suppress_langchain_deprecation_warning,
     warn_deprecated,
 )
 
 
 @pytest.mark.parametrize(
-    "kwargs, expected_message",
+    ("kwargs", "expected_message"),
     [
         (
             {
@@ -23,8 +27,10 @@ from langchain_core._api.deprecation import (
                 "pending": True,
                 "obj_type": "class",
             },
-            "The class `OldClass` will be deprecated in a future version. Use NewClass "
-            "instead.",
+            (
+                "The class `OldClass` will be deprecated in a future version. "
+                "Use NewClass instead."
+            ),
         ),
         (
             {
@@ -50,8 +56,10 @@ from langchain_core._api.deprecation import (
                 "addendum": "Please migrate your code.",
                 "removal": "2.5.0",
             },
-            "`SomeFunction` was deprecated in LangChain 1.5.0 and will be "
-            "removed in 2.5.0 Please migrate your code.",
+            (
+                "`SomeFunction` was deprecated in LangChain 1.5.0 and will be "
+                "removed in 2.5.0 Please migrate your code."
+            ),
         ),
     ],
 )
@@ -67,10 +75,16 @@ def test_warn_deprecated(kwargs: dict[str, Any], expected_message: str) -> None:
         assert str(warning) == expected_message
 
 
-def test_undefined_deprecation_schedule() -> None:
-    """This test is expected to fail until we defined a deprecation schedule."""
-    with pytest.raises(NotImplementedError):
-        warn_deprecated("1.0.0", pending=False)
+def test_warn_deprecated_without_removal() -> None:
+    """`removal` is optional; warning omits the removal phrase when not provided."""
+    with warnings.catch_warnings(record=True) as warning_list:
+        warnings.simplefilter("always")
+        warn_deprecated("1.0.0", name="SomeFunction", pending=False)
+
+        assert len(warning_list) == 1
+        message = str(warning_list[0].message)
+        assert message == "`SomeFunction` was deprecated in LangChain 1.0.0"
+        assert "will be removed" not in message
 
 
 @deprecated(since="2.0.0", removal="3.0.0", pending=False)
@@ -118,6 +132,25 @@ class ClassWithDeprecatedMethods:
         return "This is a deprecated property."
 
 
+def test_suppressed_deprecation_warning_does_not_consume_warning() -> None:
+    """Suppressed calls should not block a later user-visible warning.
+
+    For example, an internal compatibility path may call a deprecated method while
+    saving/loading an object with warnings suppressed. That hidden call should not
+    prevent the user's later direct call from seeing the deprecation warning.
+    """
+
+    @deprecated(since="2.0.0", removal="3.0.0", pending=False)
+    def local_deprecated_function() -> str:
+        return "deprecated"
+
+    with suppress_langchain_deprecation_warning():
+        assert local_deprecated_function() == "deprecated"
+
+    with pytest.warns(LangChainDeprecationWarning):
+        assert local_deprecated_function() == "deprecated"
+
+
 def test_deprecated_function() -> None:
     """Test deprecated function."""
     with warnings.catch_warnings(record=True) as warning_list:
@@ -132,7 +165,7 @@ def test_deprecated_function() -> None:
 
         doc = deprecated_function.__doc__
         assert isinstance(doc, str)
-        assert doc.startswith(".. deprecated::")
+        assert doc.startswith("!!! deprecated")
 
     assert not inspect.iscoroutinefunction(deprecated_function)
 
@@ -153,7 +186,7 @@ async def test_deprecated_async_function() -> None:
 
         doc = deprecated_function.__doc__
         assert isinstance(doc, str)
-        assert doc.startswith(".. deprecated::")
+        assert doc.startswith("!!! deprecated")
 
     assert inspect.iscoroutinefunction(deprecated_async_function)
 
@@ -173,7 +206,7 @@ def test_deprecated_method() -> None:
 
         doc = obj.deprecated_method.__doc__
         assert isinstance(doc, str)
-        assert doc.startswith(".. deprecated::")
+        assert doc.startswith("!!! deprecated")
 
     assert not inspect.iscoroutinefunction(obj.deprecated_method)
 
@@ -195,7 +228,7 @@ async def test_deprecated_async_method() -> None:
 
         doc = obj.deprecated_method.__doc__
         assert isinstance(doc, str)
-        assert doc.startswith(".. deprecated::")
+        assert doc.startswith("!!! deprecated")
 
     assert inspect.iscoroutinefunction(obj.deprecated_async_method)
 
@@ -214,7 +247,7 @@ def test_deprecated_classmethod() -> None:
 
         doc = ClassWithDeprecatedMethods.deprecated_classmethod.__doc__
         assert isinstance(doc, str)
-        assert doc.startswith(".. deprecated::")
+        assert doc.startswith("!!! deprecated")
 
 
 def test_deprecated_staticmethod() -> None:
@@ -234,7 +267,7 @@ def test_deprecated_staticmethod() -> None:
         )
         doc = ClassWithDeprecatedMethods.deprecated_staticmethod.__doc__
         assert isinstance(doc, str)
-        assert doc.startswith(".. deprecated::")
+        assert doc.startswith("!!! deprecated")
 
 
 def test_deprecated_property() -> None:
@@ -254,7 +287,7 @@ def test_deprecated_property() -> None:
         )
         doc = ClassWithDeprecatedMethods.deprecated_property.__doc__
         assert isinstance(doc, str)
-        assert doc.startswith(".. deprecated::")
+        assert doc.startswith("!!! deprecated")
 
 
 def test_whole_class_deprecation() -> None:
@@ -292,7 +325,7 @@ def test_whole_class_deprecation() -> None:
         )
         # [*Deprecated*] should be inserted only once:
         if obj.__doc__ is not None:
-            assert obj.__doc__.count(".. deprecated") == 1
+            assert obj.__doc__.count("!!! deprecated") == 1
 
 
 def test_whole_class_inherited_deprecation() -> None:
@@ -347,7 +380,7 @@ def test_whole_class_inherited_deprecation() -> None:
         )
         # if [*Deprecated*] was inserted only once:
         if obj.__doc__ is not None:
-            assert obj.__doc__.count(".. deprecated") == 1
+            assert obj.__doc__.count("!!! deprecated") == 1
 
     with warnings.catch_warnings(record=True) as warning_list:
         warnings.simplefilter("always")
@@ -371,8 +404,8 @@ def test_whole_class_inherited_deprecation() -> None:
         )
         # if [*Deprecated*] was inserted only once:
         if obj.__doc__ is not None:
-            assert obj.__doc__.count(".. deprecated::") == 1
-            assert ".. deprecated::" in obj.__doc__
+            assert obj.__doc__.count("!!! deprecated") == 1
+            assert "!!! deprecated" in obj.__doc__
 
 
 # Tests with pydantic models
@@ -398,13 +431,15 @@ def test_deprecated_method_pydantic() -> None:
 
         doc = obj.deprecated_method.__doc__
         assert isinstance(doc, str)
-        assert doc.startswith(".. deprecated::")
+        assert doc.startswith("!!! deprecated")
 
 
 def test_raise_error_for_bad_decorator() -> None:
     """Verify that errors raised on init rather than on use."""
     # Should not specify both `alternative` and `alternative_import`
-    with pytest.raises(ValueError):
+    with pytest.raises(
+        ValueError, match="Cannot specify both alternative and alternative_import"
+    ):
 
         @deprecated(since="2.0.0", alternative="NewClass", alternative_import="hello")
         def deprecated_function() -> str:
@@ -491,3 +526,128 @@ def test_rename_parameter_method() -> None:
 
         with pytest.raises(TypeError):
             assert foo.a("hello", old_name="hello")  # type: ignore[call-arg]
+
+
+# Tests for PEP 702 __deprecated__ attribute
+
+
+def test_deprecated_function_has_pep702_attribute() -> None:
+    """Test that deprecated functions have `__deprecated__` attribute."""
+
+    @deprecated(since="2.0.0", removal="3.0.0", alternative="new_function")
+    def old_function() -> str:
+        """Original doc."""
+        return "old"
+
+    assert hasattr(old_function, "__deprecated__")
+    assert old_function.__deprecated__ == "Use new_function instead."
+
+
+def test_deprecated_function_with_alternative_import_has_pep702_attribute() -> None:
+    """Test `__deprecated__` with `alternative_import`."""
+
+    @deprecated(
+        since="2.0.0", removal="3.0.0", alternative_import="new_module.new_function"
+    )
+    def old_function() -> str:
+        """Original doc."""
+        return "old"
+
+    assert hasattr(old_function, "__deprecated__")
+    assert old_function.__deprecated__ == "Use new_module.new_function instead."
+
+
+def test_deprecated_function_without_alternative_has_pep702_attribute() -> None:
+    """Test `__deprecated__` without alternative shows `'Deprecated.'`."""
+
+    @deprecated(since="2.0.0", removal="3.0.0")
+    def old_function() -> str:
+        """Original doc."""
+        return "old"
+
+    assert hasattr(old_function, "__deprecated__")
+    assert old_function.__deprecated__ == "Deprecated."
+
+
+def test_deprecated_class_has_pep702_attribute() -> None:
+    """Test that deprecated classes have `__deprecated__` attribute (PEP 702)."""
+
+    @deprecated(since="2.0.0", removal="3.0.0", alternative="NewClass")
+    class OldClass:
+        def __init__(self) -> None:
+            """Original doc."""
+
+    assert hasattr(OldClass, "__deprecated__")
+    assert OldClass.__deprecated__ == "Use NewClass instead."
+
+
+def test_deprecated_class_without_alternative_has_pep702_attribute() -> None:
+    """Test `__deprecated__` on class without alternative."""
+
+    @deprecated(since="2.0.0", removal="3.0.0")
+    class OldClass:
+        def __init__(self) -> None:
+            """Original doc."""
+
+    assert hasattr(OldClass, "__deprecated__")
+    assert OldClass.__deprecated__ == "Deprecated."
+
+
+def test_deprecated_property_has_pep702_attribute() -> None:
+    """Test that deprecated properties have `__deprecated__` attribute (PEP 702).
+
+    Note: When using @property over @deprecated (which is what works in practice),
+    the `__deprecated__` attribute is set on the property's underlying `fget` function.
+    """
+
+    class MyClass:
+        @property
+        @deprecated(since="2.0.0", removal="3.0.0", alternative="new_property")
+        def old_property(self) -> str:
+            """Original doc."""
+            return "old"
+
+    prop = MyClass.__dict__["old_property"]
+    # The __deprecated__ attribute is on the underlying fget function
+    assert hasattr(prop.fget, "__deprecated__")
+    assert prop.fget.__deprecated__ == "Use new_property instead."
+
+
+def test_importing_deprecation_does_not_load_pydantic_v1() -> None:
+    """`langchain_core._api.deprecation` must not eagerly import `pydantic.v1`.
+
+    Pydantic emits a `UserWarning` from `pydantic/v1/__init__.py` on Python 3.14+,
+    and the module is on the import path for much of `langchain_core`. Run in a
+    fresh subprocess because sibling tests in this process may have already
+    imported `pydantic.v1` transitively.
+    """
+    code = (
+        "import sys\n"
+        "import langchain_core._api.deprecation  # noqa: F401\n"
+        "loaded = sorted(m for m in sys.modules if m.startswith('pydantic.v1'))\n"
+        "assert not loaded, loaded\n"
+    )
+    subprocess.run([sys.executable, "-c", code], check=True)
+
+
+def test_deprecated_pydantic_v1_field_info() -> None:
+    """The lazy v1 `FieldInfo` branch wraps and reconstructs the field correctly.
+
+    Verifies behavior when `pydantic.v1` is loaded by the caller.
+    """
+    from pydantic.v1 import BaseModel as V1Base  # noqa: PLC0415
+    from pydantic.v1.fields import FieldInfo as V1FieldInfo  # noqa: PLC0415
+
+    field = V1FieldInfo(default=1, description="original")
+    wrapped = deprecated(since="2.0.0", name="x", removal="3.0.0")(field)
+
+    assert isinstance(wrapped, V1FieldInfo)
+    assert wrapped.default == 1
+    assert "deprecated" in (wrapped.description or "").lower()
+    assert "original" in (wrapped.description or "")
+
+    # Sanity: still usable as a v1 model field.
+    class M(V1Base):
+        x: int = wrapped  # type: ignore[assignment]
+
+    assert M(x=2).x == 2

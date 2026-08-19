@@ -1,6 +1,6 @@
 """Test OpenAI llm."""
 
-from typing import Generator
+from collections.abc import Generator
 
 import pytest
 from langchain_core.callbacks import CallbackManager
@@ -67,7 +67,7 @@ def test_invoke() -> None:
     """Test invoke tokens from OpenAI."""
     llm = OpenAI()
 
-    result = llm.invoke("I'm Pickle Rick", config=dict(tags=["foo"]))
+    result = llm.invoke("I'm Pickle Rick", config={"tags": ["foo"]})
     assert isinstance(result, str)
 
 
@@ -164,7 +164,7 @@ def test_openai_invoke() -> None:
     """Test streaming tokens from OpenAI."""
     llm = OpenAI(max_tokens=10)
 
-    result = llm.invoke("I'm Pickle Rick", config=dict(tags=["foo"]))
+    result = llm.invoke("I'm Pickle Rick", config={"tags": ["foo"]})
     assert isinstance(result, str)
 
 
@@ -212,7 +212,7 @@ def test_openai_streaming_callback() -> None:
         max_tokens=10,
         streaming=True,
         temperature=0,
-        callback_manager=callback_manager,
+        callbacks=callback_manager,
         verbose=True,
     )
     llm.invoke("Write me a sentence with 100 words.")
@@ -237,7 +237,7 @@ async def test_openai_async_streaming_callback() -> None:
         max_tokens=10,
         streaming=True,
         temperature=0,
-        callback_manager=callback_manager,
+        callbacks=callback_manager,
         verbose=True,
     )
     result = await llm.agenerate(["Write me a sentence with 100 words."])
@@ -264,7 +264,7 @@ def mock_completion() -> dict:
         "id": "cmpl-3evkmQda5Hu7fcZavknQda3SQ",
         "object": "text_completion",
         "created": 1689989000,
-        "model": "gpt-3.5-turbo-instruct",
+        "model": "gpt-4.1-mini",
         "choices": [
             {"text": "Bar Baz", "index": 0, "logprobs": None, "finish_reason": "length"}
         ],

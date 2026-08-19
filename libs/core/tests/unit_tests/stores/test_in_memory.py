@@ -1,30 +1,37 @@
+from typing import Any
+
 import pytest
 from langchain_tests.integration_tests.base_store import (
     BaseStoreAsyncTests,
     BaseStoreSyncTests,
 )
+from typing_extensions import override
 
 from langchain_core.stores import InMemoryStore
 
 
 # Check against standard tests
-class TestSyncInMemoryStore(BaseStoreSyncTests):
+class TestSyncInMemoryStore(BaseStoreSyncTests[Any]):
     @pytest.fixture
+    @override
     def kv_store(self) -> InMemoryStore:
         return InMemoryStore()
 
     @pytest.fixture
-    def three_values(self) -> tuple[str, str, str]:  # type: ignore
+    @override
+    def three_values(self) -> tuple[str, str, str]:
         return "value1", "value2", "value3"
 
 
-class TestAsyncInMemoryStore(BaseStoreAsyncTests):
+class TestAsyncInMemoryStore(BaseStoreAsyncTests[Any]):
     @pytest.fixture
+    @override
     async def kv_store(self) -> InMemoryStore:
         return InMemoryStore()
 
     @pytest.fixture
-    def three_values(self) -> tuple[str, str, str]:  # type: ignore
+    @override
+    def three_values(self) -> tuple[str, str, str]:
         return "value1", "value2", "value3"
 
 

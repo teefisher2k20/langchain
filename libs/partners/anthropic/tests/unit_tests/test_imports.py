@@ -1,6 +1,11 @@
 from langchain_anthropic import __all__
 
-EXPECTED_ALL = ["ChatAnthropicMessages", "ChatAnthropic", "Anthropic", "AnthropicLLM"]
+EXPECTED_ALL = [
+    "__version__",
+    "ChatAnthropic",
+    "convert_to_anthropic_tool",
+    "AnthropicLLM",
+]
 
 
 def test_all_imports() -> None:

@@ -1,23 +1,50 @@
-from typing import List, Optional
-
-from langchain_core.callbacks.manager import CallbackManagerForRetrieverRun
+from langchain_core.callbacks.manager import (
+    AsyncCallbackManagerForRetrieverRun,
+    CallbackManagerForRetrieverRun,
+)
 from langchain_core.documents import Document
 from langchain_core.retrievers import BaseRetriever
+from typing_extensions import override
 
-from langchain.retrievers.ensemble import EnsembleRetriever
+from langchain_classic.retrievers.ensemble import EnsembleRetriever
 
 
 class MockRetriever(BaseRetriever):
-    docs: List[Document]
+    docs: list[Document]
 
+    @override
     def _get_relevant_documents(
         self,
         query: str,
         *,
-        run_manager: Optional[CallbackManagerForRetrieverRun] = None,
-    ) -> List[Document]:
-        """Return the documents"""
+        run_manager: CallbackManagerForRetrieverRun | None = None,
+    ) -> list[Document]:
+        """Return the documents."""
         return self.docs
+
+
+class BareStringRetriever(BaseRetriever):
+    """Retriever that returns bare strings instead of Documents."""
+
+    strings: list[str]
+
+    @override
+    def _get_relevant_documents(
+        self,
+        query: str,
+        *,
+        run_manager: CallbackManagerForRetrieverRun | None = None,
+    ) -> list:
+        return list(self.strings)
+
+    @override
+    async def _aget_relevant_documents(
+        self,
+        query: str,
+        *,
+        run_manager: AsyncCallbackManagerForRetrieverRun | None = None,
+    ) -> list:
+        return list(self.strings)
 
 
 def test_invoke() -> None:
@@ -32,7 +59,9 @@ def test_invoke() -> None:
     retriever2 = MockRetriever(docs=documents2)
 
     ensemble_retriever = EnsembleRetriever(
-        retrievers=[retriever1, retriever2], weights=[0.5, 0.5], id_key=None
+        retrievers=[retriever1, retriever2],
+        weights=[0.5, 0.5],
+        id_key=None,
     )
     ranked_documents = ensemble_retriever.invoke("_")
 
@@ -54,7 +83,9 @@ def test_invoke() -> None:
     retriever2 = MockRetriever(docs=documents2)
 
     ensemble_retriever = EnsembleRetriever(
-        retrievers=[retriever1, retriever2], weights=[0.5, 0.5], id_key=None
+        retrievers=[retriever1, retriever2],
+        weights=[0.5, 0.5],
+        id_key=None,
     )
     ranked_documents = ensemble_retriever.invoke("_")
 
@@ -77,7 +108,9 @@ def test_invoke() -> None:
     retriever2 = MockRetriever(docs=documents2)
 
     ensemble_retriever = EnsembleRetriever(
-        retrievers=[retriever1, retriever2], weights=[0.5, 0.5], id_key="id"
+        retrievers=[retriever1, retriever2],
+        weights=[0.5, 0.5],
+        id_key="id",
     )
     ranked_documents = ensemble_retriever.invoke("_")
 
@@ -86,3 +119,38 @@ def test_invoke() -> None:
     # Additionally, the document with page_content "b" will be ranked 1st.
     assert len(ranked_documents) == 3
     assert ranked_documents[0].page_content == "b"
+
+
+def test_rank_fusion_bare_strings() -> None:
+    """Bare strings returned by a retriever should be wrapped into Documents."""
+    retriever = BareStringRetriever(strings=["foo", "bar"])
+    ensemble = EnsembleRetriever(retrievers=[retriever], weights=[1.0])
+    results = ensemble.invoke("_")
+    assert all(isinstance(doc, Document) for doc in results)
+    assert {doc.page_content for doc in results} == {"foo", "bar"}
+
+
+async def test_arank_fusion_bare_strings() -> None:
+    """arank_fusion should wrap bare strings the same way rank_fusion does."""
+    retriever = BareStringRetriever(strings=["foo", "bar"])
+    ensemble = EnsembleRetriever(retrievers=[retriever], weights=[1.0])
+    results = await ensemble.ainvoke("_")
+    assert all(isinstance(doc, Document) for doc in results)
+    assert {doc.page_content for doc in results} == {"foo", "bar"}
+
+
+async def test_arank_fusion_matches_rank_fusion() -> None:
+    """Sync and async rank fusion should produce identical results."""
+    docs = [
+        Document(page_content="alpha", metadata={"id": 1}),
+        Document(page_content="beta", metadata={"id": 2}),
+    ]
+    retriever = MockRetriever(docs=docs)
+    ensemble = EnsembleRetriever(retrievers=[retriever], weights=[1.0])
+
+    sync_results = ensemble.invoke("_")
+    async_results = await ensemble.ainvoke("_")
+
+    assert [d.page_content for d in sync_results] == [
+        d.page_content for d in async_results
+    ]

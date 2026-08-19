@@ -1,10 +1,18 @@
-.PHONY: all format lint test tests integration_tests docker_tests help extended_tests
+.PHONY: all format lint type test tests integration_tests help extended_tests
 
 # Default target executed when no arguments are given to make.
 all: help
 
+.EXPORT_ALL_VARIABLES:
+UV_FROZEN = true
+
 # Define a variable for the test file path.
 TEST_FILE ?= tests/unit_tests/
+PYTEST_EXTRA ?=
+
+# A single canonical live request, reused to smoke both supported openai
+# majors in `integration_test` (see below).
+SDK_SMOKE_TEST = tests/integration_tests/chat_models/test_responses_standard.py::TestOpenAIResponses::test_invoke
 
 integration_test integration_tests: TEST_FILE=tests/integration_tests/
 
@@ -18,13 +26,28 @@ test tests:
 	@if [ ! -f tiktoken_cache/fb374d419588a4632f3f557e76b4b70aebbca790 ]; then \
 		curl -o tiktoken_cache/fb374d419588a4632f3f557e76b4b70aebbca790 https://openaipublic.blob.core.windows.net/encodings/o200k_base.tiktoken; \
 	fi
-	TIKTOKEN_CACHE_DIR=tiktoken_cache poetry run pytest --disable-socket --allow-unix-socket $(TEST_FILE)
+	TIKTOKEN_CACHE_DIR=tiktoken_cache uv run --group test pytest $(PYTEST_EXTRA) --disable-socket --allow-unix-socket $(TEST_FILE)
 
+# Runs the full integration suite against the locked SDK, then smokes a single
+# live request on each supported openai major so the httpx (2.x) and httpx2
+# (3.x) transport paths are always covered, regardless of which openai version
+# uv.lock currently resolves.
 integration_test integration_tests:
-	poetry run pytest -n auto $(TEST_FILE)
+	uv run --with 'openai>=2.45.0,<3.0.0' --group test --group test_integration pytest -v --tb=short $(SDK_SMOKE_TEST)
+	uv run --with 'openai>=3.0.0,<4.0.0' --group test --group test_integration pytest -v --tb=short $(SDK_SMOKE_TEST)
+	uv run --group test --group test_integration pytest -v --tb=short -n auto --benchmark-disable $(TEST_FILE)
+
+# Run VCR cassette-backed integration tests in playback-only mode (no API keys needed).
+# Catches stale cassettes caused by test input changes without re-recording.
+test_vcr:
+	uv run --group test pytest --record-mode=none -m vcr --ignore=tests/integration_tests/chat_models/test_azure_standard.py tests/integration_tests/
 
 test_watch:
-	poetry run ptw --snapshot-update --now . -- -vv $(TEST_FILE)
+	uv run --group test ptw --snapshot-update --now . -- -vv $(TEST_FILE)
+
+
+make benchmark:
+	uv run --group test pytest ./tests -m benchmark
 
 
 ######################
@@ -39,24 +62,28 @@ lint_diff format_diff: PYTHON_FILES=$(shell git diff --relative=libs/partners/op
 lint_package: PYTHON_FILES=langchain_openai
 lint_tests: PYTHON_FILES=tests
 lint_tests: MYPY_CACHE=.mypy_cache_test
+UV_RUN_LINT = uv run --all-groups
+UV_RUN_TYPE = uv run --all-groups
+lint_package lint_tests: UV_RUN_LINT = uv run --group lint
 
 lint lint_diff lint_package lint_tests:
-	[ "$(PYTHON_FILES)" = "" ] || poetry run ruff check $(PYTHON_FILES)
-	[ "$(PYTHON_FILES)" = "" ] || poetry run ruff format $(PYTHON_FILES) --diff
-	[ "$(PYTHON_FILES)" = "" ] || mkdir -p $(MYPY_CACHE) && poetry run mypy $(PYTHON_FILES) --cache-dir $(MYPY_CACHE)
+	./scripts/lint_imports.sh
+	[ "$(PYTHON_FILES)" = "" ] || $(UV_RUN_LINT) ruff check $(PYTHON_FILES)
+	[ "$(PYTHON_FILES)" = "" ] || $(UV_RUN_LINT) ruff format $(PYTHON_FILES) --diff
+	[ "$(PYTHON_FILES)" = "" ] || mkdir -p $(MYPY_CACHE) && $(UV_RUN_TYPE) mypy $(PYTHON_FILES) --cache-dir $(MYPY_CACHE)
+
+type:
+	mkdir -p $(MYPY_CACHE) && $(UV_RUN_TYPE) mypy $(PYTHON_FILES) --cache-dir $(MYPY_CACHE)
 
 format format_diff:
-	[ "$(PYTHON_FILES)" = "" ] || poetry run ruff format $(PYTHON_FILES)
-	[ "$(PYTHON_FILES)" = "" ] || poetry run ruff check --select I --fix $(PYTHON_FILES)
-
-spell_check:
-	poetry run codespell --toml pyproject.toml
-
-spell_fix:
-	poetry run codespell --toml pyproject.toml -w
+	[ "$(PYTHON_FILES)" = "" ] || $(UV_RUN_LINT) ruff format $(PYTHON_FILES)
+	[ "$(PYTHON_FILES)" = "" ] || $(UV_RUN_LINT) ruff check --fix $(PYTHON_FILES)
 
 check_imports: $(shell find langchain_openai -name '*.py')
-	poetry run python ./scripts/check_imports.py $^
+	$(UV_RUN_LINT) python ./scripts/check_imports.py $^
+
+check_version:
+	uv run python ./scripts/check_version.py
 
 ######################
 # HELP
@@ -65,8 +92,10 @@ check_imports: $(shell find langchain_openai -name '*.py')
 help:
 	@echo '----'
 	@echo 'check_imports				- check imports'
+	@echo 'check_version                - validate version consistency'
 	@echo 'format                       - run code formatters'
 	@echo 'lint                         - run linters'
+	@echo 'type                         - run type checking'
 	@echo 'test                         - run unit tests'
 	@echo 'tests                        - run unit tests'
 	@echo 'test TEST_FILE=<test_file>   - run all tests in file'

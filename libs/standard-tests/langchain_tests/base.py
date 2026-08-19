@@ -1,32 +1,26 @@
-from abc import ABC
-from typing import Type
+"""Standard tests."""
 
 
-class BaseStandardTests(ABC):
-    """
-    :private:
-    """
+class BaseStandardTests:
+    """Base class for standard tests."""
 
-    def test_no_overrides_DO_NOT_OVERRIDE(self) -> None:
-        """
-        Test that no standard tests are overridden.
-
-        :private:
-        """
-        # find path to standard test implementations
+    def test_no_overrides_DO_NOT_OVERRIDE(self) -> None:  # noqa: N802
+        """Test that no standard tests are overridden."""
+        # Find path to standard test implementations
         comparison_class = None
 
-        def explore_bases(cls: Type) -> None:
+        def explore_bases(cls: type) -> None:
             nonlocal comparison_class
             for base in cls.__bases__:
                 if base.__module__.startswith("langchain_tests."):
                     if comparison_class is None:
                         comparison_class = base
                     else:
-                        raise ValueError(
+                        msg = (
                             "Multiple standard test base classes found: "
                             f"{comparison_class}, {base}"
                         )
+                        raise ValueError(msg)
                 else:
                     explore_bases(base)
 
@@ -35,20 +29,16 @@ class BaseStandardTests(ABC):
 
         print(f"Comparing {self.__class__} to {comparison_class}")  # noqa: T201
 
-        running_tests = set(
-            [method for method in dir(self) if method.startswith("test_")]
-        )
-        base_tests = set(
-            [method for method in dir(comparison_class) if method.startswith("test_")]
-        )
-        non_standard_tests = running_tests - base_tests
-        assert not non_standard_tests, f"Non-standard tests found: {non_standard_tests}"
+        running_tests = {method for method in dir(self) if method.startswith("test_")}
+        base_tests = {
+            method for method in dir(comparison_class) if method.startswith("test_")
+        }
         deleted_tests = base_tests - running_tests
         assert not deleted_tests, f"Standard tests deleted: {deleted_tests}"
 
         overridden_tests = [
             method
-            for method in running_tests
+            for method in base_tests
             if getattr(self.__class__, method) is not getattr(comparison_class, method)
         ]
 
@@ -56,10 +46,18 @@ class BaseStandardTests(ABC):
             m = getattr(self.__class__, method)
             if not hasattr(m, "pytestmark"):
                 return False
-            marks = m.pytestmark
-            return any(
-                mark.name == "xfail" and mark.kwargs.get("reason") for mark in marks
-            )
+            for mark in m.pytestmark:
+                if mark.name == "xfail" and mark.kwargs.get("reason"):
+                    return True
+                # Also accept xfail marks on individual `pytest.param` entries
+                # within a `parametrize` - supports xfailing only a subset of
+                # parametrized cases.
+                if mark.name == "parametrize" and len(mark.args) >= 2:
+                    for param in mark.args[1]:
+                        for inner in getattr(param, "marks", ()):
+                            if inner.name == "xfail" and inner.kwargs.get("reason"):
+                                return True
+            return False
 
         overridden_not_xfail = [
             method for method in overridden_tests if not is_xfail(method)

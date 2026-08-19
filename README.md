@@ -1,142 +1,80 @@
-# 🦜️🔗 LangChain
+<div align="center">
+  <a href="https://docs.langchain.com/oss/python/langchain/overview">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset=".github/images/logo-dark.svg">
+      <source media="(prefers-color-scheme: light)" srcset=".github/images/logo-light.svg">
+      <img alt="LangChain Logo" src=".github/images/logo-dark.svg" width="50%">
+    </picture>
+  </a>
+</div>
 
-⚡ Build context-aware reasoning applications ⚡
+<div align="center">
+  <h3>The agent engineering platform.</h3>
+</div>
 
-[![Release Notes](https://img.shields.io/github/release/langchain-ai/langchain?style=flat-square)](https://github.com/langchain-ai/langchain/releases)
-[![CI](https://github.com/langchain-ai/langchain/actions/workflows/check_diffs.yml/badge.svg)](https://github.com/langchain-ai/langchain/actions/workflows/check_diffs.yml)
-[![PyPI - License](https://img.shields.io/pypi/l/langchain-core?style=flat-square)](https://opensource.org/licenses/MIT)
-[![PyPI - Downloads](https://img.shields.io/pypi/dm/langchain-core?style=flat-square)](https://pypistats.org/packages/langchain-core)
-[![GitHub star chart](https://img.shields.io/github/stars/langchain-ai/langchain?style=flat-square)](https://star-history.com/#langchain-ai/langchain)
-[![Open Issues](https://img.shields.io/github/issues-raw/langchain-ai/langchain?style=flat-square)](https://github.com/langchain-ai/langchain/issues)
-[![Open in Dev Containers](https://img.shields.io/static/v1?label=Dev%20Containers&message=Open&color=blue&logo=visualstudiocode&style=flat-square)](https://vscode.dev/redirect?url=vscode://ms-vscode-remote.remote-containers/cloneInVolume?url=https://github.com/langchain-ai/langchain)
-[![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/langchain-ai/langchain)
-[![Twitter](https://img.shields.io/twitter/url/https/twitter.com/langchainai.svg?style=social&label=Follow%20%40LangChainAI)](https://twitter.com/langchainai)
+<div align="center">
+  <a href="https://opensource.org/licenses/MIT" target="_blank"><img src="https://img.shields.io/pypi/l/langchain" alt="PyPI - License"></a>
+  <a href="https://pypistats.org/packages/langchain" target="_blank"><img src="https://img.shields.io/pepy/dt/langchain" alt="PyPI - Downloads"></a>
+  <a href="https://pypi.org/project/langchain/#history" target="_blank"><img src="https://img.shields.io/pypi/v/langchain?label=%20" alt="Version"></a>
+  <a href="https://x.com/langchain_oss" target="_blank"><img src="https://img.shields.io/twitter/url/https/twitter.com/langchain_oss.svg?style=social&label=Follow%20%40LangChain" alt="Twitter / X"></a>
+</div>
 
-Looking for the JS/TS library? Check out [LangChain.js](https://github.com/langchain-ai/langchainjs).
+<br>
 
-To help you ship LangChain apps to production faster, check out [LangSmith](https://smith.langchain.com).
-[LangSmith](https://smith.langchain.com) is a unified developer platform for building, testing, and monitoring LLM applications.
-Fill out [this form](https://www.langchain.com/contact-sales) to speak with our sales team.
+LangChain is a framework for building agents and LLM-powered applications. It helps you chain together interoperable components and third-party integrations to simplify AI application development — all while future-proofing decisions as the underlying technology evolves.
 
-## Quick Install
+> [!TIP]
+> Just getting started? Check out **[Deep Agents](http://docs.langchain.com/oss/python/deepagents/)** — a higher-level package built on LangChain for agents that have built-in capabilities for common usage patterns such as planning, subagents, file system usage, and more.
 
-With pip:
+## Quickstart
 
 ```bash
-pip install langchain
+uv add langchain
 ```
 
-With conda:
+```python
+from langchain.chat_models import init_chat_model
 
-```bash
-conda install langchain -c conda-forge
+model = init_chat_model("openai:gpt-5.5")
+result = model.invoke("Hello, world!")
 ```
 
-## 🤔 What is LangChain?
+If you're looking for more advanced customization or agent orchestration, check out [LangGraph](https://github.com/langchain-ai/langgraph), our framework for building controllable agent workflows.
 
-**LangChain** is a framework for developing applications powered by large language models (LLMs).
+For an equivalent JS/TS library, check out [LangChain.js](https://github.com/langchain-ai/langchainjs).
 
-For these applications, LangChain simplifies the entire application lifecycle:
+> [!TIP]
+> For developing, debugging, and deploying AI agents and LLM applications, see [LangSmith](https://docs.langchain.com/langsmith/home).
 
+## LangChain ecosystem
 
-- **Open-source libraries**: Build your applications using LangChain's open-source
-[components](https://python.langchain.com/docs/concepts/) and
-[third-party integrations](https://python.langchain.com/docs/integrations/providers/).
-  Use [LangGraph](https://langchain-ai.github.io/langgraph/) to build stateful agents with first-class streaming and human-in-the-loop support.
-- **Productionization**: Inspect, monitor, and evaluate your apps with [LangSmith](https://docs.smith.langchain.com/) so that you can constantly optimize and deploy with confidence.
-- **Deployment**: Turn your LangGraph applications into production-ready APIs and Assistants with [LangGraph Platform](https://langchain-ai.github.io/langgraph/cloud/).
+While the LangChain framework can be used standalone, it also integrates seamlessly with any LangChain product, giving developers a full suite of tools when building LLM applications.
 
-### Open-source libraries
+- **[Deep Agents](http://docs.langchain.com/oss/python/deepagents/)** — Build agents that can plan, use subagents, and leverage file systems for complex tasks
+- **[LangGraph](https://docs.langchain.com/oss/python/langgraph/overview)** — Build agents that can reliably handle complex tasks with our low-level agent orchestration framework
+- **[Integrations](https://docs.langchain.com/oss/python/integrations/providers/overview)** — Chat & embedding models, tools & toolkits, and more
+- **[LangSmith](https://www.langchain.com/langsmith)** — Agent evals, observability, and debugging for LLM apps
+- **[LangSmith Deployment](https://docs.langchain.com/langsmith/deployments)** — Deploy and scale agents with a purpose-built platform for long-running, stateful workflows
 
-- **`langchain-core`**: Base abstractions.
-- **Integration packages** (e.g. **`langchain-openai`**, **`langchain-anthropic`**, etc.): Important integrations have been split into lightweight packages that are co-maintained by the LangChain team and the integration developers.
-- **`langchain`**: Chains, agents, and retrieval strategies that make up an application's cognitive architecture.
-- **`langchain-community`**: Third-party integrations that are community maintained.
-- **[LangGraph](https://langchain-ai.github.io/langgraph)**: Build robust and stateful multi-actor applications with LLMs by modeling steps as edges and nodes in a graph. Integrates smoothly with LangChain, but can be used without it. To learn more about LangGraph, check out our first LangChain Academy course, *Introduction to LangGraph*, available [here](https://academy.langchain.com/courses/intro-to-langgraph).
+## Why use LangChain?
 
-### Productionization:
+LangChain helps developers build applications powered by LLMs through a standard interface for models, embeddings, vector stores, and more.
 
-- **[LangSmith](https://docs.smith.langchain.com/)**: A developer platform that lets you debug, test, evaluate, and monitor chains built on any LLM framework and seamlessly integrates with LangChain.
+- **Real-time data augmentation** — Easily connect LLMs to diverse data sources and external/internal systems, drawing from LangChain's vast library of integrations with model providers, tools, vector stores, retrievers, and more
+- **Model interoperability** — Swap models in and out as your engineering team experiments to find the best choice for your application's needs. As the industry frontier evolves, adapt quickly — LangChain's abstractions keep you moving without losing momentum
+- **Rapid prototyping** — Quickly build and iterate on LLM applications with LangChain's modular, component-based architecture. Test different approaches and workflows without rebuilding from scratch, accelerating your development cycle
+- **Production-ready features** — Deploy reliable applications with built-in support for monitoring, evaluation, and debugging through integrations like LangSmith. Scale with confidence using battle-tested patterns and best practices
+- **Vibrant community and ecosystem** — Leverage a rich ecosystem of integrations, templates, and community-contributed components. Benefit from continuous improvements and stay up-to-date with the latest AI developments through an active open-source community
+- **Flexible abstraction layers** — Work at the level of abstraction that suits your needs — from high-level chains for quick starts to low-level components for fine-grained control. LangChain grows with your application's complexity
 
-### Deployment:
+---
 
-- **[LangGraph Platform](https://langchain-ai.github.io/langgraph/cloud/)**: Turn your LangGraph applications into production-ready APIs and Assistants.
+## Resources
 
-![Diagram outlining the hierarchical organization of the LangChain framework, displaying the interconnected parts across multiple layers.](docs/static/svg/langchain_stack_112024.svg#gh-light-mode-only "LangChain Architecture Overview")
-![Diagram outlining the hierarchical organization of the LangChain framework, displaying the interconnected parts across multiple layers.](docs/static/svg/langchain_stack_112024_dark.svg#gh-dark-mode-only "LangChain Architecture Overview")
-
-## 🧱 What can you build with LangChain?
-
-**❓ Question answering with RAG**
-
-- [Documentation](https://python.langchain.com/docs/tutorials/rag/)
-- End-to-end Example: [Chat LangChain](https://chat.langchain.com) and [repo](https://github.com/langchain-ai/chat-langchain)
-
-**🧱 Extracting structured output**
-
-- [Documentation](https://python.langchain.com/docs/tutorials/extraction/)
-- End-to-end Example: [LangChain Extract](https://github.com/langchain-ai/langchain-extract/)
-
-**🤖 Chatbots**
-
-- [Documentation](https://python.langchain.com/docs/tutorials/chatbot/)
-- End-to-end Example: [Web LangChain (web researcher chatbot)](https://weblangchain.vercel.app) and [repo](https://github.com/langchain-ai/weblangchain)
-
-And much more! Head to the [Tutorials](https://python.langchain.com/docs/tutorials/) section of the docs for more.
-
-## 🚀 How does LangChain help?
-
-The main value props of the LangChain libraries are:
-
-1. **Components**: composable building blocks, tools and integrations for working with language models. Components are modular and easy-to-use, whether you are using the rest of the LangChain framework or not.
-2. **Easy orchestration with LangGraph**: [LangGraph](https://langchain-ai.github.io/langgraph/),
-built on top of `langchain-core`, has built-in support for [messages](https://python.langchain.com/docs/concepts/messages/), [tools](https://python.langchain.com/docs/concepts/tools/),
-and other LangChain abstractions. This makes it easy to combine components into
-production-ready applications with persistence, streaming, and other key features.
-Check out the LangChain [tutorials page](https://python.langchain.com/docs/tutorials/#orchestration) for examples.
-
-## Components
-
-Components fall into the following **modules**:
-
-**📃 Model I/O**
-
-This includes [prompt management](https://python.langchain.com/docs/concepts/prompt_templates/)
-and a generic interface for [chat models](https://python.langchain.com/docs/concepts/chat_models/), including a consistent interface for [tool-calling](https://python.langchain.com/docs/concepts/tool_calling/) and [structured output](https://python.langchain.com/docs/concepts/structured_outputs/) across model providers.
-
-**📚 Retrieval**
-
-Retrieval Augmented Generation involves [loading data](https://python.langchain.com/docs/concepts/document_loaders/) from a variety of sources, [preparing it](https://python.langchain.com/docs/concepts/text_splitters/), then [searching over (a.k.a. retrieving from)](https://python.langchain.com/docs/concepts/retrievers/) it for use in the generation step.
-
-**🤖 Agents**
-
-Agents allow an LLM autonomy over how a task is accomplished. Agents make decisions about which Actions to take, then take that Action, observe the result, and repeat until the task is complete. [LangGraph](https://langchain-ai.github.io/langgraph/) makes it easy to use
-LangChain components to build both [custom](https://langchain-ai.github.io/langgraph/tutorials/)
-and [built-in](https://langchain-ai.github.io/langgraph/how-tos/create-react-agent/)
-LLM agents.
-
-## 📖 Documentation
-
-Please see [here](https://python.langchain.com) for full documentation, which includes:
-
-- [Introduction](https://python.langchain.com/docs/introduction/): Overview of the framework and the structure of the docs.
-- [Tutorials](https://python.langchain.com/docs/tutorials/): If you're looking to build something specific or are more of a hands-on learner, check out our tutorials. This is the best place to get started.
-- [How-to guides](https://python.langchain.com/docs/how_to/): Answers to “How do I….?” type questions. These guides are goal-oriented and concrete; they're meant to help you complete a specific task.
-- [Conceptual guide](https://python.langchain.com/docs/concepts/): Conceptual explanations of the key parts of the framework.
-- [API Reference](https://python.langchain.com/api_reference/): Thorough documentation of every class and method.
-
-## 🌐 Ecosystem
-
-- [🦜🛠️ LangSmith](https://docs.smith.langchain.com/): Trace and evaluate your language model applications and intelligent agents to help you move from prototype to production.
-- [🦜🕸️ LangGraph](https://langchain-ai.github.io/langgraph/): Create stateful, multi-actor applications with LLMs. Integrates smoothly with LangChain, but can be used without it.
-- [🦜🕸️ LangGraph Platform](https://langchain-ai.github.io/langgraph/concepts/#langgraph-platform): Deploy LLM applications built with LangGraph into production.
-
-## 💁 Contributing
-
-As an open-source project in a rapidly developing field, we are extremely open to contributions, whether it be in the form of a new feature, improved infrastructure, or better documentation.
-
-For detailed information on how to contribute, see [here](https://python.langchain.com/docs/contributing/).
-
-## 🌟 Contributors
-
-[![langchain contributors](https://contrib.rocks/image?repo=langchain-ai/langchain&max=2000)](https://github.com/langchain-ai/langchain/graphs/contributors)
+- [Documentation](https://docs.langchain.com/oss/python/langchain/overview) — conceptual overviews and guides
+- [LangChain ecosystem overview](https://docs.langchain.com/oss/python/concepts/products) — how LangChain, LangGraph, and Deep Agents fit together
+- [API reference](https://reference.langchain.com/python) — complete reference for all public classes, functions, and types
+- [Discussions](https://forum.langchain.com/c/oss-product-help-lc-and-lg/langchain/14) — community forum for technical questions, ideas, and feedback
+- [LangChain Academy](https://academy.langchain.com/) — comprehensive, free courses on LangChain libraries and products, made by the LangChain team
+- [Contributing Guide](https://docs.langchain.com/oss/python/contributing/overview) — how to contribute and find good first issues
+- [Code of Conduct](https://github.com/langchain-ai/langchain/?tab=coc-ov-file) — community guidelines and standards

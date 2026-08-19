@@ -1,8 +1,8 @@
-from typing import Any, Optional
+from typing import Any
 
 import pytest
 from pydantic import ConfigDict, Field, model_validator
-from typing_extensions import Self
+from typing_extensions import Self, override
 
 from langchain_core.runnables import (
     ConfigurableField,
@@ -32,8 +32,9 @@ class MyRunnable(RunnableSerializable[str, str]):
         self._my_hidden_property = self.my_property
         return self
 
+    @override
     def invoke(
-        self, input: str, config: Optional[RunnableConfig] = None, **kwargs: Any
+        self, input: str, config: RunnableConfig | None = None, **kwargs: Any
     ) -> Any:
         return input + self._my_hidden_property
 
@@ -41,21 +42,27 @@ class MyRunnable(RunnableSerializable[str, str]):
         return self.my_property
 
     def my_custom_function_w_config(
-        self, config: Optional[RunnableConfig] = None
+        self,
+        config: RunnableConfig | None = None,
     ) -> str:
+        _ = config
         return self.my_property
 
     def my_custom_function_w_kw_config(
-        self, *, config: Optional[RunnableConfig] = None
+        self,
+        *,
+        config: RunnableConfig | None = None,
     ) -> str:
+        _ = config
         return self.my_property
 
 
 class MyOtherRunnable(RunnableSerializable[str, str]):
     my_other_property: str
 
+    @override
     def invoke(
-        self, input: str, config: Optional[RunnableConfig] = None, **kwargs: Any
+        self, input: str, config: RunnableConfig | None = None, **kwargs: Any
     ) -> Any:
         return input + self.my_other_property
 
@@ -63,12 +70,13 @@ class MyOtherRunnable(RunnableSerializable[str, str]):
         return self.my_other_property
 
     def my_other_custom_function_w_config(self, config: RunnableConfig) -> str:
+        _ = config
         return self.my_other_property
 
 
 def test_doubly_set_configurable() -> None:
     """Test that setting a configurable field with a default value works."""
-    runnable = MyRunnable(my_property="a")  # type: ignore
+    runnable = MyRunnable(my_property="a")
     configurable_runnable = runnable.configurable_fields(
         my_property=ConfigurableField(
             id="my_property",
@@ -81,7 +89,7 @@ def test_doubly_set_configurable() -> None:
 
 
 def test_alias_set_configurable() -> None:
-    runnable = MyRunnable(my_property="a")  # type: ignore
+    runnable = MyRunnable(my_property="a")
     configurable_runnable = runnable.configurable_fields(
         my_property=ConfigurableField(
             id="my_property_alias",
@@ -99,7 +107,7 @@ def test_alias_set_configurable() -> None:
 
 
 def test_field_alias_set_configurable() -> None:
-    runnable = MyRunnable(my_property_alias="a")
+    runnable = MyRunnable(my_property_alias="a")  # type: ignore[call-arg]
     configurable_runnable = runnable.configurable_fields(
         my_property=ConfigurableField(
             id="my_property",
@@ -117,7 +125,7 @@ def test_field_alias_set_configurable() -> None:
 
 
 def test_config_passthrough() -> None:
-    runnable = MyRunnable(my_property="a")  # type: ignore
+    runnable = MyRunnable(my_property="a")
     configurable_runnable = runnable.configurable_fields(
         my_property=ConfigurableField(
             id="my_property",
@@ -153,7 +161,7 @@ def test_config_passthrough() -> None:
 
 
 def test_config_passthrough_nested() -> None:
-    runnable = MyRunnable(my_property="a")  # type: ignore
+    runnable = MyRunnable(my_property="a")
     configurable_runnable = runnable.configurable_fields(
         my_property=ConfigurableField(
             id="my_property",

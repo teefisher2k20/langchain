@@ -1,21 +1,24 @@
-from typing import Any, Dict, Iterator, List, Optional
+from __future__ import annotations
 
-from langchain_core.callbacks import (
-    CallbackManagerForLLMRun,
-)
+from typing import TYPE_CHECKING, Any
+
 from langchain_core.language_models import BaseChatModel
-from langchain_core.messages import (
-    AIMessage,
-    AIMessageChunk,
-    BaseMessage,
-)
+from langchain_core.messages import AIMessage, AIMessageChunk, BaseMessage
 from langchain_core.messages.ai import UsageMetadata
 from langchain_core.outputs import ChatGeneration, ChatGenerationChunk, ChatResult
 from pydantic import Field
+from typing_extensions import override
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    from langchain_core.callbacks import CallbackManagerForLLMRun
 
 
 class ChatParrotLink(BaseChatModel):
-    """A custom chat model that echoes the first `parrot_buffer_length` characters
+    """Chat Parrot Link.
+
+    A custom chat model that echoes the first `parrot_buffer_length` characters
     of the input.
 
     When contributing an implementation to LangChain, carefully document
@@ -24,30 +27,34 @@ class ChatParrotLink(BaseChatModel):
     links to the underlying models documentation or API.
 
     Example:
-
-        .. code-block:: python
-
-            model = ChatParrotLink(parrot_buffer_length=2, model="bird-brain-001")
-            result = model.invoke([HumanMessage(content="hello")])
-            result = model.batch([[HumanMessage(content="hello")],
-                                 [HumanMessage(content="world")]])
+    ```python
+    model = ChatParrotLink(parrot_buffer_length=2, model="bird-brain-001")
+    result = model.invoke([HumanMessage(content="hello")])
+    result = model.batch(
+        [
+            [HumanMessage(content="hello")],
+            [HumanMessage(content="world")],
+        ]
+    )
+    ```
     """
 
     model_name: str = Field(alias="model")
     """The name of the model"""
     parrot_buffer_length: int
     """The number of characters from the last message of the prompt to be echoed."""
-    temperature: Optional[float] = None
-    max_tokens: Optional[int] = None
-    timeout: Optional[int] = None
-    stop: Optional[List[str]] = None
+    temperature: float | None = None
+    max_tokens: int | None = None
+    timeout: int | None = None
+    stop: list[str] | None = None
     max_retries: int = 2
 
+    @override
     def _generate(
         self,
-        messages: List[BaseMessage],
-        stop: Optional[List[str]] = None,
-        run_manager: Optional[CallbackManagerForLLMRun] = None,
+        messages: list[BaseMessage],
+        stop: list[str] | None = None,
+        run_manager: CallbackManagerForLLMRun | None = None,
         **kwargs: Any,
     ) -> ChatResult:
         """Override the _generate method to implement the chat model logic.
@@ -64,9 +71,14 @@ class ChatParrotLink(BaseChatModel):
                   it makes it much easier to parse the output of the model
                   downstream and understand why generation stopped.
             run_manager: A run manager with callbacks for the LLM.
+            **kwargs: Additional keyword arguments.
+
         """
         # Replace this with actual logic to generate a response from a list
         # of messages.
+        _ = stop  # Mark as used to avoid unused variable warning
+        _ = run_manager  # Mark as used to avoid unused variable warning
+        _ = kwargs  # Mark as used to avoid unused variable warning
         last_message = messages[-1]
         tokens = last_message.content[: self.parrot_buffer_length]
         ct_input_tokens = sum(len(message.content) for message in messages)
@@ -76,6 +88,7 @@ class ChatParrotLink(BaseChatModel):
             additional_kwargs={},  # Used to add additional payload to the message
             response_metadata={  # Use for response metadata
                 "time_in_seconds": 3,
+                "model_name": self.model_name,
             },
             usage_metadata={
                 "input_tokens": ct_input_tokens,
@@ -88,11 +101,12 @@ class ChatParrotLink(BaseChatModel):
         generation = ChatGeneration(message=message)
         return ChatResult(generations=[generation])
 
+    @override
     def _stream(
         self,
-        messages: List[BaseMessage],
-        stop: Optional[List[str]] = None,
-        run_manager: Optional[CallbackManagerForLLMRun] = None,
+        messages: list[BaseMessage],
+        stop: list[str] | None = None,
+        run_manager: CallbackManagerForLLMRun | None = None,
         **kwargs: Any,
     ) -> Iterator[ChatGenerationChunk]:
         """Stream the output of the model.
@@ -111,7 +125,11 @@ class ChatParrotLink(BaseChatModel):
                   it makes it much easier to parse the output of the model
                   downstream and understand why generation stopped.
             run_manager: A run manager with callbacks for the LLM.
+            **kwargs: Additional keyword arguments.
+
         """
+        _ = stop  # Mark as used to avoid unused variable warning
+        _ = kwargs  # Mark as used to avoid unused variable warning
         last_message = messages[-1]
         tokens = str(last_message.content[: self.parrot_buffer_length])
         ct_input_tokens = sum(len(message.content) for message in messages)
@@ -138,21 +156,26 @@ class ChatParrotLink(BaseChatModel):
 
         # Let's add some other information (e.g., response metadata)
         chunk = ChatGenerationChunk(
-            message=AIMessageChunk(content="", response_metadata={"time_in_sec": 3})
+            message=AIMessageChunk(
+                content="",
+                response_metadata={"time_in_sec": 3, "model_name": self.model_name},
+            )
         )
         if run_manager:
             # This is optional in newer versions of LangChain
             # The on_llm_new_token will be called automatically
-            run_manager.on_llm_new_token(token, chunk=chunk)
+            run_manager.on_llm_new_token("", chunk=chunk)
         yield chunk
 
+    @override
     @property
     def _llm_type(self) -> str:
         """Get the type of language model used by this chat model."""
         return "echoing-chat-model-advanced"
 
+    @override
     @property
-    def _identifying_params(self) -> Dict[str, Any]:
+    def _identifying_params(self) -> dict[str, Any]:
         """Return a dictionary of identifying parameters.
 
         This information is used by the LangChain callback system, which

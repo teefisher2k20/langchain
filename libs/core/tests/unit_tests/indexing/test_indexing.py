@@ -1,5 +1,5 @@
 from collections.abc import AsyncIterator, Iterable, Iterator, Sequence
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import (
     Any,
 )
@@ -13,7 +13,12 @@ from langchain_core.document_loaders.base import BaseLoader
 from langchain_core.documents import Document
 from langchain_core.embeddings import DeterministicFakeEmbedding
 from langchain_core.indexing import InMemoryRecordManager, aindex, index
-from langchain_core.indexing.api import IndexingException, _abatch, _HashedDocument
+from langchain_core.indexing.api import (
+    IndexingException,
+    _abatch,
+    _batch,
+    _get_document_with_hash,
+)
 from langchain_core.indexing.in_memory import InMemoryDocumentIndex
 from langchain_core.vectorstores import InMemoryVectorStore, VectorStore
 
@@ -45,7 +50,7 @@ def record_manager() -> InMemoryRecordManager:
     return record_manager
 
 
-@pytest_asyncio.fixture  # type: ignore
+@pytest_asyncio.fixture
 async def arecord_manager() -> InMemoryRecordManager:
     """Timestamped set fixture."""
     record_manager = InMemoryRecordManager(namespace="hello")
@@ -82,7 +87,7 @@ def test_indexing_same_content(
         ]
     )
 
-    assert index(loader, record_manager, vector_store) == {
+    assert index(loader, record_manager, vector_store, key_encoder="sha256") == {
         "num_added": 2,
         "num_deleted": 0,
         "num_skipped": 0,
@@ -93,7 +98,7 @@ def test_indexing_same_content(
 
     for _ in range(2):
         # Run the indexing again
-        assert index(loader, record_manager, vector_store) == {
+        assert index(loader, record_manager, vector_store, key_encoder="sha256") == {
             "num_added": 0,
             "num_deleted": 0,
             "num_skipped": 2,
@@ -116,7 +121,12 @@ async def test_aindexing_same_content(
         ]
     )
 
-    assert await aindex(loader, arecord_manager, vector_store) == {
+    assert await aindex(
+        loader,
+        arecord_manager,
+        vector_store,
+        key_encoder="sha256",
+    ) == {
         "num_added": 2,
         "num_deleted": 0,
         "num_skipped": 0,
@@ -127,7 +137,12 @@ async def test_aindexing_same_content(
 
     for _ in range(2):
         # Run the indexing again
-        assert await aindex(loader, arecord_manager, vector_store) == {
+        assert await aindex(
+            loader,
+            arecord_manager,
+            vector_store,
+            key_encoder="sha256",
+        ) == {
             "num_added": 0,
             "num_deleted": 0,
             "num_skipped": 2,
@@ -151,9 +166,17 @@ def test_index_simple_delete_full(
     )
 
     with patch.object(
-        record_manager, "get_time", return_value=datetime(2021, 1, 1).timestamp()
+        record_manager,
+        "get_time",
+        return_value=datetime(2021, 1, 1, tzinfo=timezone.utc).timestamp(),
     ):
-        assert index(loader, record_manager, vector_store, cleanup="full") == {
+        assert index(
+            loader,
+            record_manager,
+            vector_store,
+            cleanup="full",
+            key_encoder="sha256",
+        ) == {
             "num_added": 2,
             "num_deleted": 0,
             "num_skipped": 0,
@@ -161,9 +184,17 @@ def test_index_simple_delete_full(
         }
 
     with patch.object(
-        record_manager, "get_time", return_value=datetime(2021, 1, 1).timestamp()
+        record_manager,
+        "get_time",
+        return_value=datetime(2021, 1, 1, tzinfo=timezone.utc).timestamp(),
     ):
-        assert index(loader, record_manager, vector_store, cleanup="full") == {
+        assert index(
+            loader,
+            record_manager,
+            vector_store,
+            cleanup="full",
+            key_encoder="sha256",
+        ) == {
             "num_added": 0,
             "num_deleted": 0,
             "num_skipped": 2,
@@ -182,13 +213,21 @@ def test_index_simple_delete_full(
     )
 
     with patch.object(
-        record_manager, "get_time", return_value=datetime(2021, 1, 2).timestamp()
+        record_manager,
+        "get_time",
+        return_value=datetime(2021, 1, 2, tzinfo=timezone.utc).timestamp(),
     ):
-        indexing_result = index(loader, record_manager, vector_store, cleanup="full")
+        indexing_result = index(
+            loader,
+            record_manager,
+            vector_store,
+            cleanup="full",
+            key_encoder="sha256",
+        )
 
         doc_texts = {
             # Ignoring type since doc should be in the store and not a None
-            vector_store.get_by_ids([uid])[0].page_content  # type: ignore
+            vector_store.get_by_ids([uid])[0].page_content
             for uid in vector_store.store
         }
         assert doc_texts == {"mutated document 1", "This is another document."}
@@ -202,9 +241,17 @@ def test_index_simple_delete_full(
 
     # Attempt to index again verify that nothing changes
     with patch.object(
-        record_manager, "get_time", return_value=datetime(2021, 1, 2).timestamp()
+        record_manager,
+        "get_time",
+        return_value=datetime(2021, 1, 2, tzinfo=timezone.utc).timestamp(),
     ):
-        assert index(loader, record_manager, vector_store, cleanup="full") == {
+        assert index(
+            loader,
+            record_manager,
+            vector_store,
+            cleanup="full",
+            key_encoder="sha256",
+        ) == {
             "num_added": 0,
             "num_deleted": 0,
             "num_skipped": 2,
@@ -228,9 +275,17 @@ async def test_aindex_simple_delete_full(
     )
 
     with patch.object(
-        arecord_manager, "get_time", return_value=datetime(2021, 1, 1).timestamp()
+        arecord_manager,
+        "get_time",
+        return_value=datetime(2021, 1, 1, tzinfo=timezone.utc).timestamp(),
     ):
-        assert await aindex(loader, arecord_manager, vector_store, cleanup="full") == {
+        assert await aindex(
+            loader,
+            arecord_manager,
+            vector_store,
+            cleanup="full",
+            key_encoder="sha256",
+        ) == {
             "num_added": 2,
             "num_deleted": 0,
             "num_skipped": 0,
@@ -238,9 +293,17 @@ async def test_aindex_simple_delete_full(
         }
 
     with patch.object(
-        arecord_manager, "get_time", return_value=datetime(2021, 1, 1).timestamp()
+        arecord_manager,
+        "get_time",
+        return_value=datetime(2021, 1, 1, tzinfo=timezone.utc).timestamp(),
     ):
-        assert await aindex(loader, arecord_manager, vector_store, cleanup="full") == {
+        assert await aindex(
+            loader,
+            arecord_manager,
+            vector_store,
+            cleanup="full",
+            key_encoder="sha256",
+        ) == {
             "num_added": 0,
             "num_deleted": 0,
             "num_skipped": 2,
@@ -259,9 +322,17 @@ async def test_aindex_simple_delete_full(
     )
 
     with patch.object(
-        arecord_manager, "get_time", return_value=datetime(2021, 1, 2).timestamp()
+        arecord_manager,
+        "get_time",
+        return_value=datetime(2021, 1, 2, tzinfo=timezone.utc).timestamp(),
     ):
-        assert await aindex(loader, arecord_manager, vector_store, cleanup="full") == {
+        assert await aindex(
+            loader,
+            arecord_manager,
+            vector_store,
+            cleanup="full",
+            key_encoder="sha256",
+        ) == {
             "num_added": 1,
             "num_deleted": 1,
             "num_skipped": 1,
@@ -270,16 +341,24 @@ async def test_aindex_simple_delete_full(
 
     doc_texts = {
         # Ignoring type since doc should be in the store and not a None
-        vector_store.get_by_ids([uid])[0].page_content  # type: ignore
+        vector_store.get_by_ids([uid])[0].page_content
         for uid in vector_store.store
     }
     assert doc_texts == {"mutated document 1", "This is another document."}
 
     # Attempt to index again verify that nothing changes
     with patch.object(
-        arecord_manager, "get_time", return_value=datetime(2021, 1, 2).timestamp()
+        arecord_manager,
+        "get_time",
+        return_value=datetime(2021, 1, 2, tzinfo=timezone.utc).timestamp(),
     ):
-        assert await aindex(loader, arecord_manager, vector_store, cleanup="full") == {
+        assert await aindex(
+            loader,
+            arecord_manager,
+            vector_store,
+            cleanup="full",
+            key_encoder="sha256",
+        ) == {
             "num_added": 0,
             "num_deleted": 0,
             "num_skipped": 2,
@@ -303,9 +382,17 @@ def test_index_delete_full_recovery_after_deletion_failure(
     )
 
     with patch.object(
-        record_manager, "get_time", return_value=datetime(2021, 1, 1).timestamp()
+        record_manager,
+        "get_time",
+        return_value=datetime(2021, 1, 1, tzinfo=timezone.utc).timestamp(),
     ):
-        assert index(loader, record_manager, vector_store, cleanup="full") == {
+        assert index(
+            loader,
+            record_manager,
+            vector_store,
+            cleanup="full",
+            key_encoder="sha256",
+        ) == {
             "num_added": 2,
             "num_deleted": 0,
             "num_skipped": 0,
@@ -325,18 +412,26 @@ def test_index_delete_full_recovery_after_deletion_failure(
 
     with (
         patch.object(
-            record_manager, "get_time", return_value=datetime(2021, 1, 2).timestamp()
+            record_manager,
+            "get_time",
+            return_value=datetime(2021, 1, 2, tzinfo=timezone.utc).timestamp(),
         ),
         patch.object(vector_store, "delete", return_value=False),
         pytest.raises(IndexingException),
     ):
-        indexing_result = index(loader, record_manager, vector_store, cleanup="full")
+        indexing_result = index(
+            loader,
+            record_manager,
+            vector_store,
+            cleanup="full",
+            key_encoder="sha256",
+        )
 
     # At this point, there should be 3 records in both the record manager
     # and the vector store
     doc_texts = {
         # Ignoring type since doc should be in the store and not a None
-        vector_store.get_by_ids([uid])[0].page_content  # type: ignore
+        vector_store.get_by_ids([uid])[0].page_content
         for uid in vector_store.store
     }
     assert doc_texts == {
@@ -346,12 +441,20 @@ def test_index_delete_full_recovery_after_deletion_failure(
     }
 
     with patch.object(
-        record_manager, "get_time", return_value=datetime(2021, 1, 3).timestamp()
+        record_manager,
+        "get_time",
+        return_value=datetime(2021, 1, 3, tzinfo=timezone.utc).timestamp(),
     ):
-        indexing_result = index(loader, record_manager, vector_store, cleanup="full")
+        indexing_result = index(
+            loader,
+            record_manager,
+            vector_store,
+            cleanup="full",
+            key_encoder="sha256",
+        )
         doc_texts = {
             # Ignoring type since doc should be in the store and not a None
-            vector_store.get_by_ids([uid])[0].page_content  # type: ignore
+            vector_store.get_by_ids([uid])[0].page_content
             for uid in vector_store.store
         }
         assert doc_texts == {"mutated document 1", "This is another document."}
@@ -380,9 +483,17 @@ async def test_aindex_delete_full_recovery_after_deletion_failure(
     )
 
     with patch.object(
-        arecord_manager, "get_time", return_value=datetime(2021, 1, 1).timestamp()
+        arecord_manager,
+        "get_time",
+        return_value=datetime(2021, 1, 1, tzinfo=timezone.utc).timestamp(),
     ):
-        assert await aindex(loader, arecord_manager, vector_store, cleanup="full") == {
+        assert await aindex(
+            loader,
+            arecord_manager,
+            vector_store,
+            cleanup="full",
+            key_encoder="sha256",
+        ) == {
             "num_added": 2,
             "num_deleted": 0,
             "num_skipped": 0,
@@ -402,20 +513,26 @@ async def test_aindex_delete_full_recovery_after_deletion_failure(
 
     with (
         patch.object(
-            arecord_manager, "get_time", return_value=datetime(2021, 1, 2).timestamp()
+            arecord_manager,
+            "get_time",
+            return_value=datetime(2021, 1, 2, tzinfo=timezone.utc).timestamp(),
         ),
         patch.object(vector_store, "adelete", return_value=False),
         pytest.raises(IndexingException),
     ):
         indexing_result = await aindex(
-            loader, arecord_manager, vector_store, cleanup="full"
+            loader,
+            arecord_manager,
+            vector_store,
+            cleanup="full",
+            key_encoder="sha256",
         )
 
     # At this point, there should be 3 records in both the record manager
     # and the vector store
     doc_texts = {
         # Ignoring type since doc should be in the store and not a None
-        vector_store.get_by_ids([uid])[0].page_content  # type: ignore
+        vector_store.get_by_ids([uid])[0].page_content
         for uid in vector_store.store
     }
     assert doc_texts == {
@@ -425,14 +542,20 @@ async def test_aindex_delete_full_recovery_after_deletion_failure(
     }
 
     with patch.object(
-        arecord_manager, "get_time", return_value=datetime(2021, 1, 3).timestamp()
+        arecord_manager,
+        "get_time",
+        return_value=datetime(2021, 1, 3, tzinfo=timezone.utc).timestamp(),
     ):
         indexing_result = await aindex(
-            loader, arecord_manager, vector_store, cleanup="full"
+            loader,
+            arecord_manager,
+            vector_store,
+            cleanup="full",
+            key_encoder="sha256",
         )
         doc_texts = {
             # Ignoring type since doc should be in the store and not a None
-            vector_store.get_by_ids([uid])[0].page_content  # type: ignore
+            vector_store.get_by_ids([uid])[0].page_content
             for uid in vector_store.store
         }
         assert doc_texts == {"mutated document 1", "This is another document."}
@@ -466,11 +589,24 @@ def test_incremental_fails_with_bad_source_ids(
         ]
     )
 
-    with pytest.raises(ValueError):
+    with pytest.raises(
+        ValueError,
+        match="Source id key is required when cleanup mode is "
+        "incremental or scoped_full",
+    ):
         # Should raise an error because no source id function was specified
-        index(loader, record_manager, vector_store, cleanup="incremental")
+        index(
+            loader,
+            record_manager,
+            vector_store,
+            cleanup="incremental",
+            key_encoder="sha256",
+        )
 
-    with pytest.raises(ValueError):
+    with pytest.raises(
+        ValueError,
+        match="Source IDs are required when cleanup mode is incremental or scoped_full",
+    ):
         # Should raise an error because no source id function was specified
         index(
             loader,
@@ -478,6 +614,7 @@ def test_incremental_fails_with_bad_source_ids(
             vector_store,
             cleanup="incremental",
             source_id_key="source",
+            key_encoder="sha256",
         )
 
 
@@ -502,16 +639,24 @@ async def test_aincremental_fails_with_bad_source_ids(
         ]
     )
 
-    with pytest.raises(ValueError):
+    with pytest.raises(
+        ValueError,
+        match="Source id key is required when cleanup mode "
+        "is incremental or scoped_full",
+    ):
         # Should raise an error because no source id function was specified
         await aindex(
             loader,
             arecord_manager,
             vector_store,
             cleanup="incremental",
+            key_encoder="sha256",
         )
 
-    with pytest.raises(ValueError):
+    with pytest.raises(
+        ValueError,
+        match="Source IDs are required when cleanup mode is incremental or scoped_full",
+    ):
         # Should raise an error because no source id function was specified
         await aindex(
             loader,
@@ -519,6 +664,7 @@ async def test_aincremental_fails_with_bad_source_ids(
             vector_store,
             cleanup="incremental",
             source_id_key="source",
+            key_encoder="sha256",
         )
 
 
@@ -548,7 +694,9 @@ def test_index_simple_delete_scoped_full(
     )
 
     with patch.object(
-        record_manager, "get_time", return_value=datetime(2021, 1, 1).timestamp()
+        record_manager,
+        "get_time",
+        return_value=datetime(2021, 1, 1, tzinfo=timezone.utc).timestamp(),
     ):
         assert index(
             loader,
@@ -556,6 +704,7 @@ def test_index_simple_delete_scoped_full(
             vector_store,
             cleanup="scoped_full",
             source_id_key="source",
+            key_encoder="sha256",
         ) == {
             "num_added": 4,
             "num_deleted": 0,
@@ -564,7 +713,9 @@ def test_index_simple_delete_scoped_full(
         }
 
     with patch.object(
-        record_manager, "get_time", return_value=datetime(2021, 1, 2).timestamp()
+        record_manager,
+        "get_time",
+        return_value=datetime(2021, 1, 2, tzinfo=timezone.utc).timestamp(),
     ):
         assert index(
             loader,
@@ -572,6 +723,7 @@ def test_index_simple_delete_scoped_full(
             vector_store,
             cleanup="scoped_full",
             source_id_key="source",
+            key_encoder="sha256",
         ) == {
             "num_added": 0,
             "num_deleted": 0,
@@ -593,7 +745,9 @@ def test_index_simple_delete_scoped_full(
     )
 
     with patch.object(
-        record_manager, "get_time", return_value=datetime(2021, 1, 3).timestamp()
+        record_manager,
+        "get_time",
+        return_value=datetime(2021, 1, 3, tzinfo=timezone.utc).timestamp(),
     ):
         assert index(
             loader,
@@ -601,6 +755,7 @@ def test_index_simple_delete_scoped_full(
             vector_store,
             cleanup="scoped_full",
             source_id_key="source",
+            key_encoder="sha256",
         ) == {
             "num_added": 1,
             "num_deleted": 2,
@@ -609,7 +764,7 @@ def test_index_simple_delete_scoped_full(
         }
         doc_texts = {
             # Ignoring type since doc should be in the store and not a None
-            vector_store.get_by_ids([uid])[0].page_content  # type: ignore
+            vector_store.get_by_ids([uid])[0].page_content
             for uid in vector_store.store
         }
         assert doc_texts == {
@@ -620,7 +775,9 @@ def test_index_simple_delete_scoped_full(
 
     # Attempt to index again verify that nothing changes
     with patch.object(
-        record_manager, "get_time", return_value=datetime(2021, 1, 4).timestamp()
+        record_manager,
+        "get_time",
+        return_value=datetime(2021, 1, 4, tzinfo=timezone.utc).timestamp(),
     ):
         assert index(
             loader,
@@ -628,6 +785,7 @@ def test_index_simple_delete_scoped_full(
             vector_store,
             cleanup="scoped_full",
             source_id_key="source",
+            key_encoder="sha256",
         ) == {
             "num_added": 0,
             "num_deleted": 0,
@@ -662,7 +820,9 @@ async def test_aindex_simple_delete_scoped_full(
     )
 
     with patch.object(
-        arecord_manager, "get_time", return_value=datetime(2021, 1, 1).timestamp()
+        arecord_manager,
+        "get_time",
+        return_value=datetime(2021, 1, 1, tzinfo=timezone.utc).timestamp(),
     ):
         assert await aindex(
             loader,
@@ -670,6 +830,7 @@ async def test_aindex_simple_delete_scoped_full(
             vector_store,
             cleanup="scoped_full",
             source_id_key="source",
+            key_encoder="sha256",
         ) == {
             "num_added": 4,
             "num_deleted": 0,
@@ -678,7 +839,9 @@ async def test_aindex_simple_delete_scoped_full(
         }
 
     with patch.object(
-        arecord_manager, "get_time", return_value=datetime(2021, 1, 2).timestamp()
+        arecord_manager,
+        "get_time",
+        return_value=datetime(2021, 1, 2, tzinfo=timezone.utc).timestamp(),
     ):
         assert await aindex(
             loader,
@@ -686,6 +849,7 @@ async def test_aindex_simple_delete_scoped_full(
             vector_store,
             cleanup="scoped_full",
             source_id_key="source",
+            key_encoder="sha256",
         ) == {
             "num_added": 0,
             "num_deleted": 0,
@@ -707,7 +871,9 @@ async def test_aindex_simple_delete_scoped_full(
     )
 
     with patch.object(
-        arecord_manager, "get_time", return_value=datetime(2021, 1, 3).timestamp()
+        arecord_manager,
+        "get_time",
+        return_value=datetime(2021, 1, 3, tzinfo=timezone.utc).timestamp(),
     ):
         assert await aindex(
             loader,
@@ -715,6 +881,7 @@ async def test_aindex_simple_delete_scoped_full(
             vector_store,
             cleanup="scoped_full",
             source_id_key="source",
+            key_encoder="sha256",
         ) == {
             "num_added": 1,
             "num_deleted": 2,
@@ -723,7 +890,7 @@ async def test_aindex_simple_delete_scoped_full(
         }
         doc_texts = {
             # Ignoring type since doc should be in the store and not a None
-            vector_store.get_by_ids([uid])[0].page_content  # type: ignore
+            vector_store.get_by_ids([uid])[0].page_content
             for uid in vector_store.store
         }
         assert doc_texts == {
@@ -734,7 +901,9 @@ async def test_aindex_simple_delete_scoped_full(
 
     # Attempt to index again verify that nothing changes
     with patch.object(
-        arecord_manager, "get_time", return_value=datetime(2021, 1, 4).timestamp()
+        arecord_manager,
+        "get_time",
+        return_value=datetime(2021, 1, 4, tzinfo=timezone.utc).timestamp(),
     ):
         assert await aindex(
             loader,
@@ -742,6 +911,7 @@ async def test_aindex_simple_delete_scoped_full(
             vector_store,
             cleanup="scoped_full",
             source_id_key="source",
+            key_encoder="sha256",
         ) == {
             "num_added": 0,
             "num_deleted": 0,
@@ -771,11 +941,24 @@ def test_scoped_full_fails_with_bad_source_ids(
         ]
     )
 
-    with pytest.raises(ValueError):
+    with pytest.raises(
+        ValueError,
+        match="Source id key is required when cleanup mode "
+        "is incremental or scoped_full",
+    ):
         # Should raise an error because no source id function was specified
-        index(loader, record_manager, vector_store, cleanup="scoped_full")
+        index(
+            loader,
+            record_manager,
+            vector_store,
+            cleanup="scoped_full",
+            key_encoder="sha256",
+        )
 
-    with pytest.raises(ValueError):
+    with pytest.raises(
+        ValueError,
+        match="Source IDs are required when cleanup mode is incremental or scoped_full",
+    ):
         # Should raise an error because no source id function was specified
         index(
             loader,
@@ -783,6 +966,7 @@ def test_scoped_full_fails_with_bad_source_ids(
             vector_store,
             cleanup="scoped_full",
             source_id_key="source",
+            key_encoder="sha256",
         )
 
 
@@ -807,11 +991,24 @@ async def test_ascoped_full_fails_with_bad_source_ids(
         ]
     )
 
-    with pytest.raises(ValueError):
+    with pytest.raises(
+        ValueError,
+        match="Source id key is required when cleanup mode "
+        "is incremental or scoped_full",
+    ):
         # Should raise an error because no source id function was specified
-        await aindex(loader, arecord_manager, vector_store, cleanup="scoped_full")
+        await aindex(
+            loader,
+            arecord_manager,
+            vector_store,
+            cleanup="scoped_full",
+            key_encoder="sha256",
+        )
 
-    with pytest.raises(ValueError):
+    with pytest.raises(
+        ValueError,
+        match="Source IDs are required when cleanup mode is incremental or scoped_full",
+    ):
         # Should raise an error because no source id function was specified
         await aindex(
             loader,
@@ -819,7 +1016,178 @@ async def test_ascoped_full_fails_with_bad_source_ids(
             vector_store,
             cleanup="scoped_full",
             source_id_key="source",
+            key_encoder="sha256",
         )
+
+
+def test_index_empty_doc_scoped_full(
+    record_manager: InMemoryRecordManager, vector_store: InMemoryVectorStore
+) -> None:
+    """Test Indexing with scoped_full strategy."""
+    loader = ToyLoader(
+        documents=[
+            Document(
+                page_content="This is a test document.",
+                metadata={"source": "1"},
+            ),
+            Document(
+                page_content="This is another document.",
+                metadata={"source": "1"},
+            ),
+            Document(
+                page_content="This is yet another document.",
+                metadata={"source": "1"},
+            ),
+            Document(
+                page_content="This is a test document from another source.",
+                metadata={"source": "2"},
+            ),
+        ]
+    )
+
+    with patch.object(
+        record_manager,
+        "get_time",
+        return_value=datetime(2021, 1, 1, tzinfo=timezone.utc).timestamp(),
+    ):
+        assert index(
+            loader,
+            record_manager,
+            vector_store,
+            cleanup="scoped_full",
+            source_id_key="source",
+            key_encoder="sha256",
+        ) == {
+            "num_added": 4,
+            "num_deleted": 0,
+            "num_skipped": 0,
+            "num_updated": 0,
+        }
+
+    with patch.object(
+        record_manager,
+        "get_time",
+        return_value=datetime(2021, 1, 2, tzinfo=timezone.utc).timestamp(),
+    ):
+        assert index(
+            loader,
+            record_manager,
+            vector_store,
+            cleanup="scoped_full",
+            source_id_key="source",
+            key_encoder="sha256",
+        ) == {
+            "num_added": 0,
+            "num_deleted": 0,
+            "num_skipped": 4,
+            "num_updated": 0,
+        }
+
+    loader = ToyLoader(documents=[])
+
+    with patch.object(
+        record_manager,
+        "get_time",
+        return_value=datetime(2021, 1, 3, tzinfo=timezone.utc).timestamp(),
+    ):
+        assert index(
+            loader,
+            record_manager,
+            vector_store,
+            cleanup="scoped_full",
+            source_id_key="source",
+            key_encoder="sha256",
+        ) == {
+            "num_added": 0,
+            "num_deleted": 0,
+            "num_skipped": 0,
+            "num_updated": 0,
+        }
+
+
+async def test_aindex_empty_doc_scoped_full(
+    arecord_manager: InMemoryRecordManager, vector_store: InMemoryVectorStore
+) -> None:
+    """Test Indexing with scoped_full strategy."""
+    loader = ToyLoader(
+        documents=[
+            Document(
+                page_content="This is a test document.",
+                metadata={"source": "1"},
+            ),
+            Document(
+                page_content="This is another document.",
+                metadata={"source": "1"},
+            ),
+            Document(
+                page_content="This is yet another document.",
+                metadata={"source": "1"},
+            ),
+            Document(
+                page_content="This is a test document from another source.",
+                metadata={"source": "2"},
+            ),
+        ]
+    )
+
+    with patch.object(
+        arecord_manager,
+        "get_time",
+        return_value=datetime(2021, 1, 1, tzinfo=timezone.utc).timestamp(),
+    ):
+        assert await aindex(
+            loader,
+            arecord_manager,
+            vector_store,
+            cleanup="scoped_full",
+            source_id_key="source",
+            key_encoder="sha256",
+        ) == {
+            "num_added": 4,
+            "num_deleted": 0,
+            "num_skipped": 0,
+            "num_updated": 0,
+        }
+
+    with patch.object(
+        arecord_manager,
+        "get_time",
+        return_value=datetime(2021, 1, 2, tzinfo=timezone.utc).timestamp(),
+    ):
+        assert await aindex(
+            loader,
+            arecord_manager,
+            vector_store,
+            cleanup="scoped_full",
+            source_id_key="source",
+            key_encoder="sha256",
+        ) == {
+            "num_added": 0,
+            "num_deleted": 0,
+            "num_skipped": 4,
+            "num_updated": 0,
+        }
+
+    loader = ToyLoader(documents=[])
+
+    with patch.object(
+        arecord_manager,
+        "get_time",
+        return_value=datetime(2021, 1, 3, tzinfo=timezone.utc).timestamp(),
+    ):
+        assert await aindex(
+            loader,
+            arecord_manager,
+            vector_store,
+            cleanup="scoped_full",
+            source_id_key="source",
+            key_encoder="sha256",
+        ) == {
+            "num_added": 0,
+            "num_deleted": 0,
+            "num_skipped": 0,
+            "num_updated": 0,
+        }
 
 
 def test_no_delete(
@@ -840,7 +1208,9 @@ def test_no_delete(
     )
 
     with patch.object(
-        record_manager, "get_time", return_value=datetime(2021, 1, 2).timestamp()
+        record_manager,
+        "get_time",
+        return_value=datetime(2021, 1, 2, tzinfo=timezone.utc).timestamp(),
     ):
         assert index(
             loader,
@@ -848,6 +1218,7 @@ def test_no_delete(
             vector_store,
             cleanup=None,
             source_id_key="source",
+            key_encoder="sha256",
         ) == {
             "num_added": 2,
             "num_deleted": 0,
@@ -857,7 +1228,9 @@ def test_no_delete(
 
     # If we add the same content twice it should be skipped
     with patch.object(
-        record_manager, "get_time", return_value=datetime(2021, 1, 2).timestamp()
+        record_manager,
+        "get_time",
+        return_value=datetime(2021, 1, 2, tzinfo=timezone.utc).timestamp(),
     ):
         assert index(
             loader,
@@ -865,6 +1238,7 @@ def test_no_delete(
             vector_store,
             cleanup=None,
             source_id_key="source",
+            key_encoder="sha256",
         ) == {
             "num_added": 0,
             "num_deleted": 0,
@@ -887,7 +1261,9 @@ def test_no_delete(
 
     # Should result in no updates or deletions!
     with patch.object(
-        record_manager, "get_time", return_value=datetime(2021, 1, 2).timestamp()
+        record_manager,
+        "get_time",
+        return_value=datetime(2021, 1, 2, tzinfo=timezone.utc).timestamp(),
     ):
         assert index(
             loader,
@@ -895,6 +1271,7 @@ def test_no_delete(
             vector_store,
             cleanup=None,
             source_id_key="source",
+            key_encoder="sha256",
         ) == {
             "num_added": 1,
             "num_deleted": 0,
@@ -921,7 +1298,9 @@ async def test_ano_delete(
     )
 
     with patch.object(
-        arecord_manager, "get_time", return_value=datetime(2021, 1, 2).timestamp()
+        arecord_manager,
+        "get_time",
+        return_value=datetime(2021, 1, 2, tzinfo=timezone.utc).timestamp(),
     ):
         assert await aindex(
             loader,
@@ -929,6 +1308,7 @@ async def test_ano_delete(
             vector_store,
             cleanup=None,
             source_id_key="source",
+            key_encoder="sha256",
         ) == {
             "num_added": 2,
             "num_deleted": 0,
@@ -938,7 +1318,9 @@ async def test_ano_delete(
 
     # If we add the same content twice it should be skipped
     with patch.object(
-        arecord_manager, "get_time", return_value=datetime(2021, 1, 2).timestamp()
+        arecord_manager,
+        "get_time",
+        return_value=datetime(2021, 1, 2, tzinfo=timezone.utc).timestamp(),
     ):
         assert await aindex(
             loader,
@@ -946,6 +1328,7 @@ async def test_ano_delete(
             vector_store,
             cleanup=None,
             source_id_key="source",
+            key_encoder="sha256",
         ) == {
             "num_added": 0,
             "num_deleted": 0,
@@ -968,7 +1351,9 @@ async def test_ano_delete(
 
     # Should result in no updates or deletions!
     with patch.object(
-        arecord_manager, "get_time", return_value=datetime(2021, 1, 2).timestamp()
+        arecord_manager,
+        "get_time",
+        return_value=datetime(2021, 1, 2, tzinfo=timezone.utc).timestamp(),
     ):
         assert await aindex(
             loader,
@@ -976,6 +1361,7 @@ async def test_ano_delete(
             vector_store,
             cleanup=None,
             source_id_key="source",
+            key_encoder="sha256",
         ) == {
             "num_added": 1,
             "num_deleted": 0,
@@ -1002,7 +1388,9 @@ def test_incremental_delete(
     )
 
     with patch.object(
-        record_manager, "get_time", return_value=datetime(2021, 1, 1).timestamp()
+        record_manager,
+        "get_time",
+        return_value=datetime(2021, 1, 1, tzinfo=timezone.utc).timestamp(),
     ):
         assert index(
             loader,
@@ -1010,6 +1398,7 @@ def test_incremental_delete(
             vector_store,
             cleanup="incremental",
             source_id_key="source",
+            key_encoder="sha256",
         ) == {
             "num_added": 2,
             "num_deleted": 0,
@@ -1019,14 +1408,16 @@ def test_incremental_delete(
 
     doc_texts = {
         # Ignoring type since doc should be in the store and not a None
-        vector_store.get_by_ids([uid])[0].page_content  # type: ignore
+        vector_store.get_by_ids([uid])[0].page_content
         for uid in vector_store.store
     }
     assert doc_texts == {"This is another document.", "This is a test document."}
 
     # Attempt to index again verify that nothing changes
     with patch.object(
-        record_manager, "get_time", return_value=datetime(2021, 1, 2).timestamp()
+        record_manager,
+        "get_time",
+        return_value=datetime(2021, 1, 2, tzinfo=timezone.utc).timestamp(),
     ):
         assert index(
             loader,
@@ -1034,6 +1425,7 @@ def test_incremental_delete(
             vector_store,
             cleanup="incremental",
             source_id_key="source",
+            key_encoder="sha256",
         ) == {
             "num_added": 0,
             "num_deleted": 0,
@@ -1061,7 +1453,9 @@ def test_incremental_delete(
 
     # Attempt to index again verify that nothing changes
     with patch.object(
-        record_manager, "get_time", return_value=datetime(2021, 1, 3).timestamp()
+        record_manager,
+        "get_time",
+        return_value=datetime(2021, 1, 3, tzinfo=timezone.utc).timestamp(),
     ):
         assert index(
             loader,
@@ -1069,6 +1463,7 @@ def test_incremental_delete(
             vector_store,
             cleanup="incremental",
             source_id_key="source",
+            key_encoder="sha256",
         ) == {
             "num_added": 2,
             "num_deleted": 1,
@@ -1078,7 +1473,7 @@ def test_incremental_delete(
 
     doc_texts = {
         # Ignoring type since doc should be in the store and not a None
-        vector_store.get_by_ids([uid])[0].page_content  # type: ignore
+        vector_store.get_by_ids([uid])[0].page_content
         for uid in vector_store.store
     }
     assert doc_texts == {
@@ -1106,7 +1501,9 @@ def test_incremental_delete_with_same_source(
     )
 
     with patch.object(
-        record_manager, "get_time", return_value=datetime(2021, 1, 1).timestamp()
+        record_manager,
+        "get_time",
+        return_value=datetime(2021, 1, 1, tzinfo=timezone.utc).timestamp(),
     ):
         assert index(
             loader,
@@ -1114,6 +1511,7 @@ def test_incremental_delete_with_same_source(
             vector_store,
             cleanup="incremental",
             source_id_key="source",
+            key_encoder="sha256",
         ) == {
             "num_added": 2,
             "num_deleted": 0,
@@ -1123,7 +1521,7 @@ def test_incremental_delete_with_same_source(
 
     doc_texts = {
         # Ignoring type since doc should be in the store and not a None
-        vector_store.get_by_ids([uid])[0].page_content  # type: ignore
+        vector_store.get_by_ids([uid])[0].page_content
         for uid in vector_store.store
     }
     assert doc_texts == {"This is another document.", "This is a test document."}
@@ -1139,7 +1537,9 @@ def test_incremental_delete_with_same_source(
     )
 
     with patch.object(
-        record_manager, "get_time", return_value=datetime(2021, 1, 2).timestamp()
+        record_manager,
+        "get_time",
+        return_value=datetime(2021, 1, 2, tzinfo=timezone.utc).timestamp(),
     ):
         assert index(
             loader,
@@ -1147,6 +1547,7 @@ def test_incremental_delete_with_same_source(
             vector_store,
             cleanup="incremental",
             source_id_key="source",
+            key_encoder="sha256",
         ) == {
             "num_added": 0,
             "num_deleted": 1,
@@ -1156,7 +1557,7 @@ def test_incremental_delete_with_same_source(
 
     doc_texts = {
         # Ignoring type since doc should be in the store and not a None
-        vector_store.get_by_ids([uid])[0].page_content  # type: ignore
+        vector_store.get_by_ids([uid])[0].page_content
         for uid in vector_store.store
     }
     assert doc_texts == {
@@ -1190,7 +1591,9 @@ def test_incremental_indexing_with_batch_size(
     )
 
     with patch.object(
-        record_manager, "get_time", return_value=datetime(2021, 1, 1).timestamp()
+        record_manager,
+        "get_time",
+        return_value=datetime(2021, 1, 1, tzinfo=timezone.utc).timestamp(),
     ):
         assert index(
             loader,
@@ -1199,6 +1602,7 @@ def test_incremental_indexing_with_batch_size(
             cleanup="incremental",
             source_id_key="source",
             batch_size=2,
+            key_encoder="sha256",
         ) == {
             "num_added": 4,
             "num_deleted": 0,
@@ -1208,13 +1612,15 @@ def test_incremental_indexing_with_batch_size(
 
     doc_texts = {
         # Ignoring type since doc should be in the store and not a None
-        vector_store.get_by_ids([uid])[0].page_content  # type: ignore
+        vector_store.get_by_ids([uid])[0].page_content
         for uid in vector_store.store
     }
     assert doc_texts == {"1", "2", "3", "4"}
 
     with patch.object(
-        record_manager, "get_time", return_value=datetime(2021, 1, 2).timestamp()
+        record_manager,
+        "get_time",
+        return_value=datetime(2021, 1, 2, tzinfo=timezone.utc).timestamp(),
     ):
         assert index(
             loader,
@@ -1223,6 +1629,7 @@ def test_incremental_indexing_with_batch_size(
             cleanup="incremental",
             source_id_key="source",
             batch_size=2,
+            key_encoder="sha256",
         ) == {
             "num_added": 2,
             "num_deleted": 2,
@@ -1232,7 +1639,7 @@ def test_incremental_indexing_with_batch_size(
 
     doc_texts = {
         # Ignoring type since doc should be in the store and not a None
-        vector_store.get_by_ids([uid])[0].page_content  # type: ignore
+        vector_store.get_by_ids([uid])[0].page_content
         for uid in vector_store.store
     }
     assert doc_texts == {"1", "2", "3", "4"}
@@ -1264,7 +1671,9 @@ def test_incremental_delete_with_batch_size(
     )
 
     with patch.object(
-        record_manager, "get_time", return_value=datetime(2021, 1, 1).timestamp()
+        record_manager,
+        "get_time",
+        return_value=datetime(2021, 1, 1, tzinfo=timezone.utc).timestamp(),
     ):
         assert index(
             loader,
@@ -1273,6 +1682,7 @@ def test_incremental_delete_with_batch_size(
             cleanup="incremental",
             source_id_key="source",
             batch_size=3,
+            key_encoder="sha256",
         ) == {
             "num_added": 4,
             "num_deleted": 0,
@@ -1282,14 +1692,16 @@ def test_incremental_delete_with_batch_size(
 
     doc_texts = {
         # Ignoring type since doc should be in the store and not a None
-        vector_store.get_by_ids([uid])[0].page_content  # type: ignore
+        vector_store.get_by_ids([uid])[0].page_content
         for uid in vector_store.store
     }
     assert doc_texts == {"1", "2", "3", "4"}
 
     # Attempt to index again verify that nothing changes
     with patch.object(
-        record_manager, "get_time", return_value=datetime(2021, 1, 2).timestamp()
+        record_manager,
+        "get_time",
+        return_value=datetime(2021, 1, 2, tzinfo=timezone.utc).timestamp(),
     ):
         assert index(
             loader,
@@ -1298,6 +1710,7 @@ def test_incremental_delete_with_batch_size(
             cleanup="incremental",
             source_id_key="source",
             batch_size=3,
+            key_encoder="sha256",
         ) == {
             "num_added": 0,
             "num_deleted": 0,
@@ -1307,14 +1720,16 @@ def test_incremental_delete_with_batch_size(
 
     doc_texts = {
         # Ignoring type since doc should be in the store and not a None
-        vector_store.get_by_ids([uid])[0].page_content  # type: ignore
+        vector_store.get_by_ids([uid])[0].page_content
         for uid in vector_store.store
     }
     assert doc_texts == {"1", "2", "3", "4"}
 
     # Attempt to index again verify that nothing changes
     with patch.object(
-        record_manager, "get_time", return_value=datetime(2022, 1, 3).timestamp()
+        record_manager,
+        "get_time",
+        return_value=datetime(2022, 1, 3, tzinfo=timezone.utc).timestamp(),
     ):
         # Docs with same content
         docs = [
@@ -1334,6 +1749,7 @@ def test_incremental_delete_with_batch_size(
             cleanup="incremental",
             source_id_key="source",
             batch_size=1,
+            key_encoder="sha256",
         ) == {
             "num_added": 0,
             "num_deleted": 0,
@@ -1343,14 +1759,16 @@ def test_incremental_delete_with_batch_size(
 
     doc_texts = {
         # Ignoring type since doc should be in the store and not a None
-        vector_store.get_by_ids([uid])[0].page_content  # type: ignore
+        vector_store.get_by_ids([uid])[0].page_content
         for uid in vector_store.store
     }
     assert doc_texts == {"1", "2", "3", "4"}
 
     # Attempt to index again verify that nothing changes
     with patch.object(
-        record_manager, "get_time", return_value=datetime(2023, 1, 4).timestamp()
+        record_manager,
+        "get_time",
+        return_value=datetime(2023, 1, 4, tzinfo=timezone.utc).timestamp(),
     ):
         # Docs with same content
         docs = [
@@ -1370,6 +1788,7 @@ def test_incremental_delete_with_batch_size(
             cleanup="incremental",
             source_id_key="source",
             batch_size=1,
+            key_encoder="sha256",
         ) == {
             "num_added": 0,
             "num_deleted": 0,
@@ -1379,14 +1798,16 @@ def test_incremental_delete_with_batch_size(
 
     doc_texts = {
         # Ignoring type since doc should be in the store and not a None
-        vector_store.get_by_ids([uid])[0].page_content  # type: ignore
+        vector_store.get_by_ids([uid])[0].page_content
         for uid in vector_store.store
     }
     assert doc_texts == {"1", "2", "3", "4"}
 
     # Try to index with changed docs now
     with patch.object(
-        record_manager, "get_time", return_value=datetime(2024, 1, 5).timestamp()
+        record_manager,
+        "get_time",
+        return_value=datetime(2024, 1, 5, tzinfo=timezone.utc).timestamp(),
     ):
         # Docs with same content
         docs = [
@@ -1405,6 +1826,7 @@ def test_incremental_delete_with_batch_size(
             vector_store,
             cleanup="incremental",
             source_id_key="source",
+            key_encoder="sha256",
         ) == {
             "num_added": 2,
             "num_deleted": 2,
@@ -1414,7 +1836,7 @@ def test_incremental_delete_with_batch_size(
 
     doc_texts = {
         # Ignoring type since doc should be in the store and not a None
-        vector_store.get_by_ids([uid])[0].page_content  # type: ignore
+        vector_store.get_by_ids([uid])[0].page_content
         for uid in vector_store.store
     }
     assert doc_texts == {"changed 1", "changed 2", "3", "4"}
@@ -1438,7 +1860,9 @@ async def test_aincremental_delete(
     )
 
     with patch.object(
-        arecord_manager, "get_time", return_value=datetime(2021, 1, 2).timestamp()
+        arecord_manager,
+        "get_time",
+        return_value=datetime(2021, 1, 2, tzinfo=timezone.utc).timestamp(),
     ):
         assert await aindex(
             loader.lazy_load(),
@@ -1446,6 +1870,7 @@ async def test_aincremental_delete(
             vector_store,
             cleanup="incremental",
             source_id_key="source",
+            key_encoder="sha256",
         ) == {
             "num_added": 2,
             "num_deleted": 0,
@@ -1455,14 +1880,16 @@ async def test_aincremental_delete(
 
     doc_texts = {
         # Ignoring type since doc should be in the store and not a None
-        vector_store.get_by_ids([uid])[0].page_content  # type: ignore
+        vector_store.get_by_ids([uid])[0].page_content
         for uid in vector_store.store
     }
     assert doc_texts == {"This is another document.", "This is a test document."}
 
     # Attempt to index again verify that nothing changes
     with patch.object(
-        arecord_manager, "get_time", return_value=datetime(2021, 1, 2).timestamp()
+        arecord_manager,
+        "get_time",
+        return_value=datetime(2021, 1, 2, tzinfo=timezone.utc).timestamp(),
     ):
         assert await aindex(
             loader.lazy_load(),
@@ -1470,6 +1897,7 @@ async def test_aincremental_delete(
             vector_store,
             cleanup="incremental",
             source_id_key="source",
+            key_encoder="sha256",
         ) == {
             "num_added": 0,
             "num_deleted": 0,
@@ -1497,7 +1925,9 @@ async def test_aincremental_delete(
 
     # Attempt to index again verify that nothing changes
     with patch.object(
-        arecord_manager, "get_time", return_value=datetime(2021, 1, 3).timestamp()
+        arecord_manager,
+        "get_time",
+        return_value=datetime(2021, 1, 3, tzinfo=timezone.utc).timestamp(),
     ):
         assert await aindex(
             loader.lazy_load(),
@@ -1505,6 +1935,7 @@ async def test_aincremental_delete(
             vector_store,
             cleanup="incremental",
             source_id_key="source",
+            key_encoder="sha256",
         ) == {
             "num_added": 2,
             "num_deleted": 1,
@@ -1514,7 +1945,7 @@ async def test_aincremental_delete(
 
     doc_texts = {
         # Ignoring type since doc should be in the store and not a None
-        vector_store.get_by_ids([uid])[0].page_content  # type: ignore
+        vector_store.get_by_ids([uid])[0].page_content
         for uid in vector_store.store
     }
     assert doc_texts == {
@@ -1530,7 +1961,13 @@ def test_indexing_with_no_docs(
     """Check edge case when loader returns no new docs."""
     loader = ToyLoader(documents=[])
 
-    assert index(loader, record_manager, vector_store, cleanup="full") == {
+    assert index(
+        loader,
+        record_manager,
+        vector_store,
+        cleanup="full",
+        key_encoder="sha256",
+    ) == {
         "num_added": 0,
         "num_deleted": 0,
         "num_skipped": 0,
@@ -1544,7 +1981,13 @@ async def test_aindexing_with_no_docs(
     """Check edge case when loader returns no new docs."""
     loader = ToyLoader(documents=[])
 
-    assert await aindex(loader, arecord_manager, vector_store, cleanup="full") == {
+    assert await aindex(
+        loader,
+        arecord_manager,
+        vector_store,
+        cleanup="full",
+        key_encoder="sha256",
+    ) == {
         "num_added": 0,
         "num_deleted": 0,
         "num_skipped": 0,
@@ -1568,10 +2011,16 @@ def test_deduplication(
     ]
 
     # Should result in only a single document being added
-    assert index(docs, record_manager, vector_store, cleanup="full") == {
+    assert index(
+        docs,
+        record_manager,
+        vector_store,
+        cleanup="full",
+        key_encoder="sha256",
+    ) == {
         "num_added": 1,
         "num_deleted": 0,
-        "num_skipped": 0,
+        "num_skipped": 1,
         "num_updated": 0,
     }
 
@@ -1592,15 +2041,133 @@ async def test_adeduplication(
     ]
 
     # Should result in only a single document being added
-    assert await aindex(docs, arecord_manager, vector_store, cleanup="full") == {
+    assert await aindex(
+        docs,
+        arecord_manager,
+        vector_store,
+        cleanup="full",
+        key_encoder="sha256",
+    ) == {
         "num_added": 1,
         "num_deleted": 0,
-        "num_skipped": 0,
+        "num_skipped": 1,
         "num_updated": 0,
     }
 
 
-def test_cleanup_with_different_batchsize(
+def test_within_batch_deduplication_counting(
+    record_manager: InMemoryRecordManager, vector_store: VectorStore
+) -> None:
+    """Test that within-batch deduplicated documents are counted in num_skipped."""
+    # Create documents with within-batch duplicates
+    docs = [
+        Document(
+            page_content="Document A",
+            metadata={"source": "1"},
+        ),
+        Document(
+            page_content="Document A",  # Duplicate in same batch
+            metadata={"source": "1"},
+        ),
+        Document(
+            page_content="Document B",
+            metadata={"source": "2"},
+        ),
+        Document(
+            page_content="Document B",  # Duplicate in same batch
+            metadata={"source": "2"},
+        ),
+        Document(
+            page_content="Document C",
+            metadata={"source": "3"},
+        ),
+    ]
+
+    # Index with large batch size to ensure all docs are in one batch
+    result = index(
+        docs,
+        record_manager,
+        vector_store,
+        batch_size=10,  # All docs in one batch
+        cleanup="full",
+        key_encoder="sha256",
+    )
+
+    # Should have 3 unique documents added
+    assert result["num_added"] == 3
+    # Should have 2 documents skipped due to within-batch deduplication
+    assert result["num_skipped"] == 2
+    # Total should match input
+    assert result["num_added"] + result["num_skipped"] == len(docs)
+    assert result["num_deleted"] == 0
+    assert result["num_updated"] == 0
+
+    # Verify the content
+    assert isinstance(vector_store, InMemoryVectorStore)
+    ids = list(vector_store.store.keys())
+    contents = sorted(
+        [document.page_content for document in vector_store.get_by_ids(ids)]
+    )
+    assert contents == ["Document A", "Document B", "Document C"]
+
+
+async def test_awithin_batch_deduplication_counting(
+    arecord_manager: InMemoryRecordManager, vector_store: VectorStore
+) -> None:
+    """Test that within-batch deduplicated documents are counted in num_skipped."""
+    # Create documents with within-batch duplicates
+    docs = [
+        Document(
+            page_content="Document A",
+            metadata={"source": "1"},
+        ),
+        Document(
+            page_content="Document A",  # Duplicate in same batch
+            metadata={"source": "1"},
+        ),
+        Document(
+            page_content="Document B",
+            metadata={"source": "2"},
+        ),
+        Document(
+            page_content="Document B",  # Duplicate in same batch
+            metadata={"source": "2"},
+        ),
+        Document(
+            page_content="Document C",
+            metadata={"source": "3"},
+        ),
+    ]
+
+    # Index with large batch size to ensure all docs are in one batch
+    result = await aindex(
+        docs,
+        arecord_manager,
+        vector_store,
+        batch_size=10,  # All docs in one batch
+        cleanup="full",
+        key_encoder="sha256",
+    )
+
+    # Should have 3 unique documents added
+    assert result["num_added"] == 3
+    # Should have 2 documents skipped due to within-batch deduplication
+    assert result["num_skipped"] == 2
+    # Total should match input
+    assert result["num_added"] + result["num_skipped"] == len(docs)
+    assert result["num_deleted"] == 0
+    assert result["num_updated"] == 0
+
+    # Verify the content
+    assert isinstance(vector_store, InMemoryVectorStore)
+    ids = list(vector_store.store.keys())
+    contents = sorted(
+        [document.page_content for document in vector_store.get_by_ids(ids)]
+    )
+    assert contents == ["Document A", "Document B", "Document C"]
+
+
+def test_full_cleanup_with_different_batchsize(
     record_manager: InMemoryRecordManager, vector_store: VectorStore
 ) -> None:
     """Check that we can clean up with different batch size."""
@@ -1612,7 +2179,13 @@ def test_cleanup_with_different_batchsize(
         for d in range(1000)
     ]
 
-    assert index(docs, record_manager, vector_store, cleanup="full") == {
+    assert index(
+        docs,
+        record_manager,
+        vector_store,
+        cleanup="full",
+        key_encoder="sha256",
+    ) == {
         "num_added": 1000,
         "num_deleted": 0,
         "num_skipped": 0,
@@ -1628,7 +2201,12 @@ def test_cleanup_with_different_batchsize(
     ]
 
     assert index(
-        docs, record_manager, vector_store, cleanup="full", cleanup_batch_size=17
+        docs,
+        record_manager,
+        vector_store,
+        cleanup="full",
+        cleanup_batch_size=17,
+        key_encoder="sha256",
     ) == {
         "num_added": 1001,
         "num_deleted": 1000,
@@ -1637,7 +2215,57 @@ def test_cleanup_with_different_batchsize(
     }
 
 
-async def test_async_cleanup_with_different_batchsize(
+def test_incremental_cleanup_with_different_batchsize(
+    record_manager: InMemoryRecordManager, vector_store: VectorStore
+) -> None:
+    """Check that we can clean up with different batch size."""
+    docs = [
+        Document(
+            page_content="This is a test document.",
+            metadata={"source": str(d)},
+        )
+        for d in range(1000)
+    ]
+
+    assert index(
+        docs,
+        record_manager,
+        vector_store,
+        source_id_key="source",
+        cleanup="incremental",
+        key_encoder="sha256",
+    ) == {
+        "num_added": 1000,
+        "num_deleted": 0,
+        "num_skipped": 0,
+        "num_updated": 0,
+    }
+
+    docs = [
+        Document(
+            page_content="Different doc",
+            metadata={"source": str(d)},
+        )
+        for d in range(1001)
+    ]
+
+    assert index(
+        docs,
+        record_manager,
+        vector_store,
+        source_id_key="source",
+        cleanup="incremental",
+        cleanup_batch_size=17,
+        key_encoder="sha256",
+    ) == {
+        "num_added": 1001,
+        "num_deleted": 1000,
+        "num_skipped": 0,
+        "num_updated": 0,
+    }
+
+
+async def test_afull_cleanup_with_different_batchsize(
     arecord_manager: InMemoryRecordManager, vector_store: InMemoryVectorStore
 ) -> None:
     """Check that we can clean up with different batch size."""
@@ -1649,7 +2277,13 @@ async def test_async_cleanup_with_different_batchsize(
         for d in range(1000)
     ]
 
-    assert await aindex(docs, arecord_manager, vector_store, cleanup="full") == {
+    assert await aindex(
+        docs,
+        arecord_manager,
+        vector_store,
+        cleanup="full",
+        key_encoder="sha256",
+    ) == {
         "num_added": 1000,
         "num_deleted": 0,
         "num_skipped": 0,
@@ -1665,7 +2299,62 @@ async def test_async_cleanup_with_different_batchsize(
     ]
 
     assert await aindex(
-        docs, arecord_manager, vector_store, cleanup="full", cleanup_batch_size=17
+        docs,
+        arecord_manager,
+        vector_store,
+        cleanup="full",
+        cleanup_batch_size=17,
+        key_encoder="sha256",
+    ) == {
+        "num_added": 1001,
+        "num_deleted": 1000,
+        "num_skipped": 0,
+        "num_updated": 0,
+    }
+
+
+async def test_aincremental_cleanup_with_different_batchsize(
+    arecord_manager: InMemoryRecordManager, vector_store: InMemoryVectorStore
+) -> None:
+    """Check that we can clean up with different batch size."""
+    docs = [
+        Document(
+            page_content="This is a test document.",
+            metadata={"source": str(d)},
+        )
+        for d in range(1000)
+    ]
+
+    assert await aindex(
+        docs,
+        arecord_manager,
+        vector_store,
+        source_id_key="source",
+        cleanup="incremental",
+        key_encoder="sha256",
+    ) == {
+        "num_added": 1000,
+        "num_deleted": 0,
+        "num_skipped": 0,
+        "num_updated": 0,
+    }
+
+    docs = [
+        Document(
+            page_content="Different doc",
+            metadata={"source": str(d)},
+        )
+        for d in range(1001)
+    ]
+
+    assert await aindex(
+        docs,
+        arecord_manager,
+        vector_store,
+        cleanup="incremental",
+        source_id_key="source",
+        cleanup_batch_size=17,
+        key_encoder="sha256",
     ) == {
         "num_added": 1001,
         "num_deleted": 1000,
@@ -1697,10 +2386,16 @@ def test_deduplication_v2(
         ),
     ]
 
-    assert index(docs, record_manager, vector_store, cleanup="full") == {
+    assert index(
+        docs,
+        record_manager,
+        vector_store,
+        cleanup="full",
+        key_encoder="sha256",
+    ) == {
         "num_added": 3,
         "num_deleted": 0,
-        "num_skipped": 0,
+        "num_skipped": 1,
         "num_updated": 0,
     }
 
@@ -1739,6 +2434,26 @@ async def test_abatch() -> None:
     assert [batch async for batch in batches] == [[0, 1], [2, 3], [4]]
 
 
+def test_batch_validation() -> None:
+    """Test that _batch raises ValueError for non-positive batch sizes."""
+    with pytest.raises(ValueError, match="Batch size must be a positive integer"):
+        list(_batch(0, [1, 2, 3]))
+
+    with pytest.raises(ValueError, match="Batch size must be a positive integer"):
+        list(_batch(-1, [1, 2, 3]))
+
+
+async def test_abatch_validation() -> None:
+    """Test that _abatch raises ValueError for non-positive batch sizes."""
+    with pytest.raises(ValueError, match="Batch size must be a positive integer"):
+        async for _ in _abatch(0, _to_async_iter([1, 2, 3])):
+            pass
+
+    with pytest.raises(ValueError, match="Batch size must be a positive integer"):
+        async for _ in _abatch(-1, _to_async_iter([1, 2, 3])):
+            pass
+
+
 def test_indexing_force_update(
     record_manager: InMemoryRecordManager, upserting_vector_store: VectorStore
 ) -> None:
@@ -1758,26 +2473,43 @@ def test_indexing_force_update(
         ),
     ]
 
-    assert index(docs, record_manager, upserting_vector_store, cleanup="full") == {
+    assert index(
+        docs,
+        record_manager,
+        upserting_vector_store,
+        cleanup="full",
+        key_encoder="sha256",
+    ) == {
         "num_added": 2,
         "num_deleted": 0,
-        "num_skipped": 0,
-        "num_updated": 0,
-    }
-
-    assert index(docs, record_manager, upserting_vector_store, cleanup="full") == {
-        "num_added": 0,
-        "num_deleted": 0,
-        "num_skipped": 2,
+        "num_skipped": 1,
         "num_updated": 0,
     }
 
     assert index(
-        docs, record_manager, upserting_vector_store, cleanup="full", force_update=True
+        docs,
+        record_manager,
+        upserting_vector_store,
+        cleanup="full",
+        key_encoder="sha256",
     ) == {
         "num_added": 0,
         "num_deleted": 0,
-        "num_skipped": 0,
+        "num_skipped": 3,
+        "num_updated": 0,
+    }
+
+    assert index(
+        docs,
+        record_manager,
+        upserting_vector_store,
+        cleanup="full",
+        force_update=True,
+        key_encoder="sha256",
+    ) == {
+        "num_added": 0,
+        "num_deleted": 0,
+        "num_skipped": 1,
         "num_updated": 2,
     }
 
@@ -1802,20 +2534,28 @@ async def test_aindexing_force_update(
     ]
 
     assert await aindex(
-        docs, arecord_manager, upserting_vector_store, cleanup="full"
+        docs,
+        arecord_manager,
+        upserting_vector_store,
+        cleanup="full",
+        key_encoder="sha256",
     ) == {
         "num_added": 2,
         "num_deleted": 0,
-        "num_skipped": 0,
+        "num_skipped": 1,
         "num_updated": 0,
     }
 
     assert await aindex(
-        docs, arecord_manager, upserting_vector_store, cleanup="full"
+        docs,
+        arecord_manager,
+        upserting_vector_store,
+        cleanup="full",
+        key_encoder="sha256",
     ) == {
         "num_added": 0,
         "num_deleted": 0,
-        "num_skipped": 2,
+        "num_skipped": 3,
         "num_updated": 0,
     }
 
@@ -1825,10 +2565,11 @@ async def test_aindexing_force_update(
         upserting_vector_store,
         cleanup="full",
         force_update=True,
+        key_encoder="sha256",
     ) == {
         "num_added": 0,
         "num_deleted": 0,
-        "num_skipped": 0,
+        "num_skipped": 1,
         "num_updated": 2,
     }
 
@@ -1843,7 +2584,7 @@ def test_indexing_custom_batch_size(
             metadata={"source": "1"},
         ),
     ]
-    ids = [_HashedDocument.from_document(doc).uid for doc in docs]
+    ids = [_get_document_with_hash(doc, key_encoder="sha256").id for doc in docs]
 
     batch_size = 1
 
@@ -1851,9 +2592,15 @@ def test_indexing_custom_batch_size(
 
     try:
         mock_add_documents = MagicMock()
-        vector_store.add_documents = mock_add_documents  # type: ignore
+        vector_store.add_documents = mock_add_documents  # type: ignore[method-assign]
 
-        index(docs, record_manager, vector_store, batch_size=batch_size)
+        index(
+            docs,
+            record_manager,
+            vector_store,
+            batch_size=batch_size,
+            key_encoder="sha256",
+        )
         args, kwargs = mock_add_documents.call_args
         doc_with_id = Document(
             id=ids[0], page_content="This is a test document.", metadata={"source": "1"}
@@ -1861,7 +2608,7 @@ def test_indexing_custom_batch_size(
         assert args == ([doc_with_id],)
         assert kwargs == {"ids": ids, "batch_size": batch_size}
     finally:
-        vector_store.add_documents = original  # type: ignore
+        vector_store.add_documents = original  # type: ignore[method-assign]
 
 
 async def test_aindexing_custom_batch_size(
@@ -1874,15 +2621,21 @@ async def test_aindexing_custom_batch_size(
             metadata={"source": "1"},
         ),
     ]
-    ids = [_HashedDocument.from_document(doc).uid for doc in docs]
+    ids = [_get_document_with_hash(doc, key_encoder="sha256").id for doc in docs]
 
     batch_size = 1
     mock_add_documents = AsyncMock()
     doc_with_id = Document(
         id=ids[0], page_content="This is a test document.", metadata={"source": "1"}
     )
-    vector_store.aadd_documents = mock_add_documents  # type: ignore
-    await aindex(docs, arecord_manager, vector_store, batch_size=batch_size)
+    vector_store.aadd_documents = mock_add_documents  # type: ignore[method-assign]
+    await aindex(
+        docs,
+        arecord_manager,
+        vector_store,
+        batch_size=batch_size,
+        key_encoder="sha256",
+    )
     args, kwargs = mock_add_documents.call_args
     assert args == ([doc_with_id],)
     assert kwargs == {"ids": ids, "batch_size": batch_size}
@@ -1902,14 +2655,26 @@ def test_index_into_document_index(record_manager: InMemoryRecordManager) -> Non
         ),
     ]
 
-    assert index(docs, record_manager, document_index, cleanup="full") == {
+    assert index(
+        docs,
+        record_manager,
+        document_index,
+        cleanup="full",
+        key_encoder="sha256",
+    ) == {
         "num_added": 2,
         "num_deleted": 0,
         "num_skipped": 0,
         "num_updated": 0,
     }
 
-    assert index(docs, record_manager, document_index, cleanup="full") == {
+    assert index(
+        docs,
+        record_manager,
+        document_index,
+        cleanup="full",
+        key_encoder="sha256",
+    ) == {
         "num_added": 0,
         "num_deleted": 0,
         "num_skipped": 2,
@@ -1917,7 +2682,12 @@ def test_index_into_document_index(record_manager: InMemoryRecordManager) -> Non
     }
 
     assert index(
-        docs, record_manager, document_index, cleanup="full", force_update=True
+        docs,
+        record_manager,
+        document_index,
+        cleanup="full",
+        force_update=True,
+        key_encoder="sha256",
     ) == {
         "num_added": 0,
         "num_deleted": 0,
@@ -1925,7 +2695,13 @@ def test_index_into_document_index(record_manager: InMemoryRecordManager) -> Non
         "num_updated": 2,
     }
 
-    assert index([], record_manager, document_index, cleanup="full") == {
+    assert index(
+        [],
+        record_manager,
+        document_index,
+        cleanup="full",
+        key_encoder="sha256",
+    ) == {
         "num_added": 0,
         "num_deleted": 2,
         "num_skipped": 0,
@@ -1949,21 +2725,39 @@ async def test_aindex_into_document_index(
         ),
     ]
 
-    assert await aindex(docs, arecord_manager, document_index, cleanup="full") == {
+    assert await aindex(
+        docs,
+        arecord_manager,
+        document_index,
+        cleanup="full",
+        key_encoder="sha256",
+    ) == {
         "num_added": 2,
         "num_deleted": 0,
         "num_skipped": 0,
         "num_updated": 0,
     }
 
-    assert await aindex(docs, arecord_manager, document_index, cleanup="full") == {
+    assert await aindex(
+        docs,
+        arecord_manager,
+        document_index,
+        cleanup="full",
+        key_encoder="sha256",
+    ) == {
         "num_added": 0,
         "num_deleted": 0,
         "num_skipped": 2,
         "num_updated": 0,
     }
+
     assert await aindex(
-        docs, arecord_manager, document_index, cleanup="full", force_update=True
+        docs,
+        arecord_manager,
+        document_index,
+        cleanup="full",
+        force_update=True,
+        key_encoder="sha256",
     ) == {
         "num_added": 0,
         "num_deleted": 0,
@@ -1971,7 +2765,13 @@ async def test_aindex_into_document_index(
         "num_updated": 2,
     }
 
-    assert await aindex([], arecord_manager, document_index, cleanup="full") == {
+    assert await aindex(
+        [],
+        arecord_manager,
+        document_index,
+        cleanup="full",
+        key_encoder="sha256",
+    ) == {
         "num_added": 0,
         "num_deleted": 2,
         "num_skipped": 0,
@@ -1999,7 +2799,13 @@ def test_index_with_upsert_kwargs(
 
         upsert_kwargs = {"vector_field": "embedding"}
 
-        index(docs, record_manager, upserting_vector_store, upsert_kwargs=upsert_kwargs)
+        index(
+            docs,
+            record_manager,
+            upserting_vector_store,
+            upsert_kwargs=upsert_kwargs,
+            key_encoder="sha256",
+        )
 
         # Assert that add_documents was called with the correct arguments
         mock_add_documents.assert_called_once()
@@ -2016,7 +2822,7 @@ def test_index_with_upsert_kwargs(
         ]
         assert [doc.metadata for doc in args[0]] == [{"source": "1"}, {"source": "2"}]
 
-        # Check that ids are present
+        # Check that IDs are present
         assert "ids" in kwargs
         assert isinstance(kwargs["ids"], list)
         assert len(kwargs["ids"]) == 2
@@ -2052,6 +2858,7 @@ def test_index_with_upsert_kwargs_for_document_indexer(
         document_index,
         cleanup="full",
         upsert_kwargs=upsert_kwargs,
+        key_encoder="sha256",
     ) == {
         "num_added": 2,
         "num_deleted": 0,
@@ -2090,6 +2897,7 @@ async def test_aindex_with_upsert_kwargs_for_document_indexer(
         document_index,
         cleanup="full",
         upsert_kwargs=upsert_kwargs,
+        key_encoder="sha256",
     ) == {
         "num_added": 2,
         "num_deleted": 0,
@@ -2127,6 +2935,7 @@ async def test_aindex_with_upsert_kwargs(
             arecord_manager,
             upserting_vector_store,
             upsert_kwargs=upsert_kwargs,
+            key_encoder="sha256",
         )
 
         # Assert that aadd_documents was called with the correct arguments
@@ -2144,7 +2953,7 @@ async def test_aindex_with_upsert_kwargs(
         ]
         assert [doc.metadata for doc in args[0]] == [{"source": "1"}, {"source": "2"}]
 
-        # Check that ids are present
+        # Check that IDs are present
         assert "ids" in kwargs
         assert isinstance(kwargs["ids"], list)
         assert len(kwargs["ids"]) == 2

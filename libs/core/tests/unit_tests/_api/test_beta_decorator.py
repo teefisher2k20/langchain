@@ -9,15 +9,17 @@ from langchain_core._api.beta_decorator import beta, warn_beta
 
 
 @pytest.mark.parametrize(
-    "kwargs, expected_message",
+    ("kwargs", "expected_message"),
     [
         (
             {
                 "name": "OldClass",
                 "obj_type": "class",
             },
-            "The class `OldClass` is in beta. It is actively being worked on, so the "
-            "API may change.",
+            (
+                "The class `OldClass` is in beta. "
+                "It is actively being worked on, so the API may change."
+            ),
         ),
         (
             {
@@ -35,9 +37,11 @@ from langchain_core._api.beta_decorator import beta, warn_beta
                 "obj_type": "",
                 "addendum": "Please migrate your code.",
             },
-            "`SomeFunction` is in beta. It is actively being worked on, "
-            "so the API may "
-            "change. Please migrate your code.",
+            (
+                "`SomeFunction` is in beta. "
+                "It is actively being worked on, so the API may change. "
+                "Please migrate your code."
+            ),
         ),
     ],
 )
@@ -92,10 +96,18 @@ class ClassWithBetaMethods:
         return "This is a beta staticmethod."
 
     @property
-    @beta()
     def beta_property(self) -> str:
         """Original doc."""
         return "This is a beta property."
+
+    @beta_property.setter
+    def beta_property(self, _value: str) -> None:
+        pass
+
+    @beta()  # type: ignore[misc]
+    @beta_property.deleter
+    def beta_property(self) -> None:
+        pass
 
 
 def test_beta_function() -> None:
@@ -222,13 +234,16 @@ def test_beta_property() -> None:
         obj = ClassWithBetaMethods()
         assert obj.beta_property == "This is a beta property."
 
-        assert len(warning_list) == 1
-        warning = warning_list[0].message
+        obj.beta_property = "foo"
 
-        assert str(warning) == (
-            "The method `ClassWithBetaMethods.beta_property` is in beta. "
-            "It is actively being worked on, so the API may change."
-        )
+        del obj.beta_property
+
+        assert len(warning_list) == 3
+        for warning in warning_list:
+            assert str(warning.message) == (
+                "The attribute `ClassWithBetaMethods.beta_property` is in beta. "
+                "It is actively being worked on, so the API may change."
+            )
         doc = ClassWithBetaMethods.beta_property.__doc__
         assert isinstance(doc, str)
         assert doc.startswith(".. beta::")

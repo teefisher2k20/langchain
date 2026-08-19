@@ -1,10 +1,9 @@
-"""This is the langchain_chroma package.
+"""LangChain integration for Chroma vector database."""
 
-It contains the Chroma class for handling various tasks.
-"""
-
+from langchain_chroma._version import __version__
 from langchain_chroma.vectorstores import Chroma
 
 __all__ = [
     "Chroma",
+    "__version__",
 ]

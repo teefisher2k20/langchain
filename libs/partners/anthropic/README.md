@@ -1,43 +1,37 @@
 # langchain-anthropic
 
+[![PyPI - Version](https://img.shields.io/pypi/v/langchain-anthropic?label=%20)](https://pypi.org/project/langchain-anthropic/#history)
+[![PyPI - License](https://img.shields.io/pypi/l/langchain-anthropic)](https://opensource.org/licenses/MIT)
+[![PyPI - Downloads](https://img.shields.io/pepy/dt/langchain-anthropic)](https://pypistats.org/packages/langchain-anthropic)
+[![Twitter](https://img.shields.io/twitter/url/https/twitter.com/langchain_oss.svg?style=social&label=Follow%20%40LangChain)](https://x.com/langchain_oss)
+
+Looking for the JS/TS version? Check out [LangChain.js](https://github.com/langchain-ai/langchainjs).
+
+## Quick Install
+
+```bash
+uv add langchain-anthropic
+```
+
+## 🤔 What is this?
+
 This package contains the LangChain integration for Anthropic's generative models.
 
-## Installation
+## 📖 Documentation
 
-`pip install -U langchain-anthropic`
+For full documentation, see the [API reference](https://reference.langchain.com/python/integrations/langchain_anthropic/). For conceptual guides, tutorials, and examples on using these classes, see the [LangChain Docs](https://docs.langchain.com/oss/python/integrations/providers/anthropic).
 
-## Chat Models
+## 📕 Releases & Versioning
 
-Anthropic recommends using their chat models over text completions.
+See our [Releases](https://docs.langchain.com/oss/python/release-policy) and [Versioning](https://docs.langchain.com/oss/python/versioning) policies.
 
-You can see their recommended models [here](https://docs.anthropic.com/claude/docs/models-overview#model-recommendations).
+## 💁 Contributing
 
-To use, you should have an Anthropic API key configured. Initialize the model as:
+As an open-source project in a rapidly developing field, we are extremely open to contributions, whether it be in the form of a new feature, improved infrastructure, or better documentation.
 
-```
-from langchain_anthropic import ChatAnthropic
-from langchain_core.messages import AIMessage, HumanMessage
+For detailed information on how to contribute, see the [Contributing Guide](https://docs.langchain.com/oss/python/contributing/overview).
 
-model = ChatAnthropic(model="claude-3-opus-20240229", temperature=0, max_tokens=1024)
-```
+## Resources
 
-### Define the input message
-
-`message = HumanMessage(content="What is the capital of France?")`
-
-### Generate a response using the model
-
-`response = model.invoke([message])`
-
-For a more detailed walkthrough see [here](https://python.langchain.com/docs/integrations/chat/anthropic).
-
-## LLMs (Legacy)
-
-You can use the Claude 2 models for text completions.
-
-```python
-from langchain_anthropic import AnthropicLLM
-
-model = AnthropicLLM(model="claude-2.1", temperature=0, max_tokens=1024)
-response = model.invoke("The best restaurant in San Francisco is: ")
-```
+- [LangChain Academy](https://academy.langchain.com/) — comprehensive, free courses on LangChain libraries and products, made by the LangChain team
+- [Code of Conduct](https://github.com/langchain-ai/langchain/?tab=coc-ov-file) — community guidelines and standards
